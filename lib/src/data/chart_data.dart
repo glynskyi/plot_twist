@@ -121,6 +121,11 @@ class ChartData extends ChangeNotifier {
   /// Number of value columns.
   int get valueColumns => _columns.length - 1;
 
+  /// How many rows the arrays hold before they are reallocated. Only for
+  /// tests of the storage policy.
+  @visibleForTesting
+  int get debugCapacity => _capacity;
+
   /// Increases with every mutation.
   int get revision => _revision;
 
@@ -146,7 +151,9 @@ class ChartData extends ChangeNotifier {
     final bool needFront = front > _start;
     final bool needBack = _start + _length + back > _capacity;
     if (!needFront && !needBack) return;
-    final int head = needFront ? math.max(front, _length ~/ 2) : _start;
+    // Rows evicted by removeFirst sit before _start. Keep at most half the
+    // length of room there, so a sliding window does not carry them along.
+    final int head = needFront ? math.max(front, _length ~/ 2) : math.min(_start, _length ~/ 2);
     final int tail = needBack ? math.max(back, _length ~/ 2 + 16) : _capacity - _start - _length;
     final int capacity = head + _length + tail;
     for (int c = 0; c < _columns.length; c++) {

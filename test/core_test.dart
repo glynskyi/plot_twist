@@ -183,6 +183,28 @@ void main() {
       expect(d.isSorted, isFalse);
     });
 
+    test('a sliding window keeps its storage bounded', () {
+      // Live data: append a sample, evict the oldest. Evicted rows must not be
+      // carried into every new allocation, or a chart that runs for hours
+      // allocates ever larger arrays.
+      final ChartData d = ChartData();
+      for (int i = 0; i < 1000; i++) {
+        d.add(i.toDouble(), 0);
+      }
+      for (int i = 1000; i < 200000; i++) {
+        d
+          ..add(i.toDouble(), 0)
+          ..removeFirst(1);
+      }
+      expect(d.length, 1000);
+      expect(d.x(0), 199000);
+      expect(d.firstOrdinal, 199000);
+      expect(d.debugCapacity, lessThan(4 * 1000));
+      d.prependAll(<double>[198998, 198999], <double>[0, 0]);
+      expect(d.x(0), 198998);
+      expect(d.firstOrdinal, 198998);
+    });
+
     test('range queries and interpolation', () {
       final ChartData d = ChartData.fromXY(
         <double>[0, 10, 20, 30],
