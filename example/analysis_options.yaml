@@ -1,0 +1,19 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  errors:
+    # Demos must be written against the public API only.
+    implementation_imports: error
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - macos/**
+
+linter:
+  rules:
+    - prefer_single_quotes
+
+formatter:
+  page_width: 100

@@ -1,0 +1,661 @@
+import 'dart:math' as math;
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
+import 'package:flutter/widgets.dart';
+
+import '../../plot_twist.dart';
+
+/// How consecutive points of a [LineSeries] are joined.
+enum LineCurve {
+  /// Straight segments.
+  linear,
+
+  /// Horizontal then vertical: the value holds until the next point.
+  step,
+
+  /// A smooth curve that never overshoots the data (monotone cubic).
+  smooth,
+}
+
+/// Creates a shader for a series from the current view — for example a
+/// gradient whose stops sit at data values.
+typedef ChartShaderBuilder = ui.Shader Function(ChartView view);
+
+/// A line (and optionally an area under it) through the rows of a [ChartData].
+///
+/// Only the visible part is processed, and when there are far more points than
+/// pixels the line is reduced to the min/max of each pixel column, so a
+/// million points pan smoothly while looking identical.
+class LineSeries extends StatelessWidget {
+  /// Creates a line series.
+  const LineSeries({
+    super.key,
+    required this.data,
+    this.column = 0,
+    this.id,
+    this.label,
+    this.color,
+    this.width = 2,
+    this.curve = LineCurve.linear,
+    this.dash,
+    this.shader,
+    this.fillColor,
+    this.fillGradient,
+    this.baseline,
+    this.pointRadius = 0,
+    this.visible = true,
+    this.xScale = kChartX,
+    this.yScale = kChartY,
+    this.decimate = true,
+    this.clip = true,
+    this.isolate = true,
+  });
+
+  /// The data to plot.
+  final ChartData data;
+
+  /// Which value column of [data] to plot.
+  final int column;
+
+  /// Identifier of the series.
+  final Object? id;
+
+  /// Name of the series, for legends and tooltips.
+  final String? label;
+
+  /// Stroke colour. Defaults to the first palette colour of the chart theme.
+  final Color? color;
+
+  /// Stroke width in logical pixels. `0` draws no line.
+  final double width;
+
+  /// How points are joined.
+  final LineCurve curve;
+
+  /// Dash pattern: lengths of alternating dashes and gaps.
+  final List<double>? dash;
+
+  /// Builds a shader for the stroke, replacing [color].
+  final ChartShaderBuilder? shader;
+
+  /// Fills the area between the line and [baseline] with a colour.
+  final Color? fillColor;
+
+  /// Fills the area between the line and [baseline] with a gradient spanning
+  /// the plot.
+  final Gradient? fillGradient;
+
+  /// The data value the fill extends to. Null fills to the bottom of the plot.
+  final double? baseline;
+
+  /// Radius of the dots drawn on data points when they are far enough apart.
+  /// `0` draws none.
+  final double pointRadius;
+
+  /// Whether the series is shown; a hidden series stays listed for legends.
+  final bool visible;
+
+  /// Id of the horizontal scale.
+  final Object xScale;
+
+  /// Id of the vertical scale.
+  final Object yScale;
+
+  /// Whether dense data is reduced to per-pixel-column extremes.
+  final bool decimate;
+
+  /// Whether the line is clipped to the plot area.
+  final bool clip;
+
+  /// Whether the series paints into its own compositing layer.
+  final bool isolate;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color effectiveColor = color ?? ChartTheme.of(context).seriesColor(0);
+    return ChartPaint(
+      id: id,
+      label: label,
+      color: effectiveColor,
+      visible: visible,
+      clip: clip,
+      isolate: isolate,
+      painter: LineSeriesPainter(
+        data: data,
+        column: column,
+        color: effectiveColor,
+        width: width,
+        curve: curve,
+        dash: dash,
+        shader: shader,
+        fillColor: fillColor,
+        fillGradient: fillGradient,
+        baseline: baseline,
+        pointRadius: pointRadius,
+        xScale: xScale,
+        yScale: yScale,
+        decimate: decimate,
+      ),
+    );
+  }
+}
+
+/// Paints a [LineSeries]. Built entirely on the public [ChartSeriesPainter]
+/// contract.
+class LineSeriesPainter extends ChartSeriesPainter {
+  /// Creates a line painter.
+  LineSeriesPainter({
+    required this.data,
+    this.column = 0,
+    required this.color,
+    this.width = 2,
+    this.curve = LineCurve.linear,
+    this.dash,
+    this.shader,
+    this.fillColor,
+    this.fillGradient,
+    this.baseline,
+    this.pointRadius = 0,
+    this.decimate = true,
+    super.xScale,
+    super.yScale,
+  }) : super(data: data);
+
+  /// The data to plot.
+  final ChartData data;
+
+  /// Which value column to plot.
+  final int column;
+
+  /// Stroke colour.
+  final Color color;
+
+  /// Stroke width.
+  final double width;
+
+  /// How points are joined.
+  final LineCurve curve;
+
+  /// Dash pattern.
+  final List<double>? dash;
+
+  /// Stroke shader builder.
+  final ChartShaderBuilder? shader;
+
+  /// Area fill colour.
+  final Color? fillColor;
+
+  /// Area fill gradient.
+  final Gradient? fillGradient;
+
+  /// Data value the fill extends to.
+  final double? baseline;
+
+  /// Radius of point dots.
+  final double pointRadius;
+
+  /// Whether dense data is decimated.
+  final bool decimate;
+
+  bool get _hasFill => fillColor != null || fillGradient != null;
+
+  @override
+  bool shouldRepaint(LineSeriesPainter oldDelegate) =>
+      !identical(oldDelegate.data, data) ||
+      oldDelegate.column != column ||
+      oldDelegate.color != color ||
+      oldDelegate.width != width ||
+      oldDelegate.curve != curve ||
+      oldDelegate.dash != dash ||
+      oldDelegate.shader != shader ||
+      oldDelegate.fillColor != fillColor ||
+      oldDelegate.fillGradient != fillGradient ||
+      oldDelegate.baseline != baseline ||
+      oldDelegate.pointRadius != pointRadius ||
+      oldDelegate.decimate != decimate;
+
+  @override
+  bool shouldRescale(LineSeriesPainter oldDelegate) =>
+      !identical(oldDelegate.data, data) ||
+      oldDelegate.column != column ||
+      oldDelegate.baseline != baseline ||
+      oldDelegate._hasFill != _hasFill;
+
+  // ---------------------------------------------------------------- data
+
+  @override
+  ChartDataBounds? bounds({ChartRange? xWindow, ChartRange? yWindow}) {
+    if (data.isEmpty) return null;
+    ChartRange? y;
+    if (xWindow != null && data.isSorted) {
+      final (int start, int end) = data.indexRange(xWindow.min, xWindow.max, overscan: 0);
+      y = data.valueExtent(column: column, start: start, end: end);
+      // The line also shows where it crosses the edges of the window.
+      for (final double edge in <double>[xWindow.min, xWindow.max]) {
+        final double? v = valueAt(edge);
+        if (v != null) y = y == null ? ChartRange(v, v) : y.include(v);
+      }
+    } else {
+      y = data.valueExtent(column: column);
+    }
+    final double? base = baseline;
+    if (y != null && _hasFill && base != null) y = y.include(base);
+    return ChartDataBounds(x: data.xExtent, y: y);
+  }
+
+  @override
+  double? valueAt(double x) {
+    if (data.isEmpty || !data.isSorted) return null;
+    switch (curve) {
+      case LineCurve.linear:
+        return data.interpolate(x, column: column);
+      case LineCurve.step:
+        final int i = data.upperBound(x) - 1;
+        if (i < 0 || (i == data.length - 1 && x > data.x(i))) return null;
+        final double v = data.value(i, column);
+        return v.isNaN ? null : v;
+      case LineCurve.smooth:
+        return _smoothAt(x);
+    }
+  }
+
+  double? _smoothAt(double x) {
+    final int hi = data.lowerBound(x);
+    if (hi >= data.length) return null;
+    if (data.x(hi) == x) {
+      final double v = data.value(hi, column);
+      return v.isNaN ? null : v;
+    }
+    if (hi == 0) return null;
+    final int lo = hi - 1;
+    final double x0 = data.x(lo);
+    final double x1 = data.x(hi);
+    final double y0 = data.value(lo, column);
+    final double y1 = data.value(hi, column);
+    if (y0.isNaN || y1.isNaN || x1 == x0) return null;
+    double tangent(int i, int before, int after) {
+      final bool hasBefore = before >= 0 && !data.value(before, column).isNaN;
+      final bool hasAfter = after < data.length && !data.value(after, column).isNaN;
+      final double slope = (y1 - y0) / (x1 - x0);
+      if (!hasBefore && !hasAfter) return slope;
+      if (!hasBefore) {
+        return _edgeSlope(slope);
+      }
+      if (!hasAfter) {
+        return _edgeSlope(slope);
+      }
+      return _steffen(
+        data.x(before),
+        data.value(before, column), //
+        data.x(i),
+        data.value(i, column),
+        data.x(after),
+        data.value(after, column),
+      );
+    }
+
+    final double m0 = tangent(lo, lo - 1, hi);
+    final double m1 = tangent(hi, lo, hi + 1);
+    final double h = x1 - x0;
+    final double t = (x - x0) / h;
+    final double t2 = t * t;
+    final double t3 = t2 * t;
+    return (2 * t3 - 3 * t2 + 1) * y0 +
+        (t3 - 2 * t2 + t) * h * m0 +
+        (-2 * t3 + 3 * t2) * y1 +
+        (t3 - t2) * h * m1;
+  }
+
+  static double _edgeSlope(double slope) => slope;
+
+  // Steffen's monotone tangent at the middle of three points.
+  static double _steffen(double x0, double y0, double x1, double y1, double x2, double y2) {
+    final double h0 = x1 - x0;
+    final double h1 = x2 - x1;
+    if (h0 == 0 || h1 == 0) return 0;
+    final double s0 = (y1 - y0) / h0;
+    final double s1 = (y2 - y1) / h1;
+    final double p = (s0 * h1 + s1 * h0) / (h0 + h1);
+    final double sign =
+        (s0 < 0 ? -1.0 : (s0 > 0 ? 1.0 : 0.0)) + (s1 < 0 ? -1.0 : (s1 > 0 ? 1.0 : 0.0));
+    return sign * math.min(math.min(s0.abs(), s1.abs()), 0.5 * p.abs());
+  }
+
+  @override
+  void collectHits(ChartHitQuery query, List<ChartHit> hits) {
+    if (data.isEmpty) return;
+    final ChartView view = query.view;
+    if (!view.scales.containsKey(xScale) || !view.scales.containsKey(yScale)) return;
+    final ChartScaleView xs = view.scale(xScale);
+    final ChartScaleView ys = view.scale(yScale);
+
+    ChartHit? hitFor(int i) {
+      final double x = data.x(i);
+      final double y = data.value(i, column);
+      if (y.isNaN) return null;
+      final Offset position = Offset(xs.toPixel(x), ys.toPixel(y));
+      final double distance = query.mode == ChartHitMode.nearestX
+          ? (position.dx - query.position.dx).abs()
+          : (position - query.position).distance;
+      if (distance > query.maxDistance) return null;
+      return ChartHit(x: x, y: y, position: position, distance: distance, index: i);
+    }
+
+    if (query.mode == ChartHitMode.nearestX || !data.isSorted) {
+      final int i = data.nearestIndex(xs.toValue(query.position.dx));
+      if (i < 0) return;
+      final ChartHit? hit = hitFor(i);
+      if (hit != null) hits.add(hit);
+      return;
+    }
+    // Nearest by distance: look at the rows around the pointer.
+    final double radius = query.maxDistance.isFinite ? query.maxDistance : 24;
+    final double a = xs.toValue(query.position.dx - radius);
+    final double b = xs.toValue(query.position.dx + radius);
+    final (int start, int end) = data.indexRange(math.min(a, b), math.max(a, b));
+    ChartHit? best;
+    final int stride = math.max(1, (end - start) ~/ 512);
+    for (int i = start; i < end; i += stride) {
+      final ChartHit? hit = hitFor(i);
+      if (hit != null && (best == null || hit.distance < best.distance)) best = hit;
+    }
+    if (best != null) hits.add(best);
+  }
+
+  // --------------------------------------------------------------- paint
+
+  @override
+  void paint(ChartPaintContext context) {
+    final ChartView view = context.view;
+    if (data.isEmpty || !view.scales.containsKey(xScale) || !view.scales.containsKey(yScale)) {
+      return;
+    }
+    final ChartScaleView xs = view.scale(xScale);
+    final ChartScaleView ys = view.scale(yScale);
+    if (xs.extent <= 0 || ys.extent <= 0) return;
+    final (int start, int end) = data.indexRange(xs.min, xs.max);
+    if (end <= start) return;
+
+    final _Polyline line = _Polyline();
+    final bool dense =
+        decimate && data.isSorted && curve == LineCurve.linear && (end - start) > xs.extent * 10;
+    if (dense) {
+      _collectDecimated(line, xs, ys, start, end);
+    } else {
+      _collectAll(line, xs, ys, start, end);
+    }
+    line.clampEnds(-xs.extent, xs.extent * 2);
+    if (line.isEmpty) return;
+
+    final Canvas canvas = context.canvas;
+    final Rect plot = Offset.zero & view.size;
+
+    if (_hasFill) {
+      final double base = baseline == null ? view.size.height : ys.toPixel(baseline!);
+      final ui.Path fill = ui.Path();
+      line.forEachSegment((int from, int to) {
+        if (to - from < 2) return;
+        _addSegment(fill, line, from, to);
+        fill.lineTo(line.x(to - 1), base);
+        fill.lineTo(line.x(from), base);
+        fill.close();
+      });
+      final Paint paint = Paint()..style = PaintingStyle.fill;
+      final Gradient? gradient = fillGradient;
+      if (gradient != null) {
+        paint.shader = gradient.createShader(plot);
+      } else {
+        paint.color = fillColor!;
+      }
+      canvas.drawPath(fill, paint);
+    }
+
+    if (width > 0) {
+      ui.Path path = ui.Path();
+      line.forEachSegment((int from, int to) {
+        if (to - from == 1) {
+          // A lone point between gaps: draw it as a dot-sized segment.
+          path.moveTo(line.x(from), line.y(from));
+          path.lineTo(line.x(from) + 0.01, line.y(from));
+        } else {
+          _addSegment(path, line, from, to);
+        }
+      });
+      final List<double>? pattern = dash;
+      if (pattern != null && pattern.isNotEmpty) path = _dashed(path, pattern);
+      final Paint paint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = width
+        ..strokeJoin = StrokeJoin.round
+        ..strokeCap = pattern == null ? StrokeCap.round : StrokeCap.butt
+        ..color = color;
+      final ChartShaderBuilder? builder = shader;
+      if (builder != null) paint.shader = builder(view);
+      canvas.drawPath(path, paint);
+    }
+
+    if (pointRadius > 0 && !dense) {
+      final int count = line.length;
+      final double spacing = xs.extent / math.max(1, end - start);
+      if (spacing >= pointRadius * 3) {
+        final Float32List points = Float32List(count * 2);
+        for (int i = 0; i < count; i++) {
+          points[i * 2] = line.x(i);
+          points[i * 2 + 1] = line.y(i);
+        }
+        canvas.drawRawPoints(
+          ui.PointMode.points,
+          points,
+          Paint()
+            ..color = color
+            ..strokeCap = StrokeCap.round
+            ..strokeWidth = pointRadius * 2,
+        );
+      }
+    }
+  }
+
+  void _collectAll(_Polyline out, ChartScaleView xs, ChartScaleView ys, int start, int end) {
+    for (int i = start; i < end; i++) {
+      final double v = data.value(i, column);
+      if (v.isNaN) {
+        out.breakSegment();
+      } else {
+        out.add(xs.toPixel(data.x(i)), ys.toPixel(v));
+      }
+    }
+  }
+
+  // Reduces each half-pixel sliver of the plot to its first, lowest, highest
+  // and last value.
+  void _collectDecimated(_Polyline out, ChartScaleView xs, ChartScaleView ys, int start, int end) {
+    // Half-pixel columns: narrower than the stroke, so the reduced line is
+    // as bold as the full one, and fine enough for high-density screens.
+    const double columnWidth = 0.5;
+    final int columns = (xs.extent / columnWidth).ceil();
+    final bool ascending = xs.toPixel(xs.max) >= xs.toPixel(xs.min);
+    double boundary(int k) => ascending
+        ? xs.toValue((k + 1) * columnWidth)
+        : xs.toValue(xs.extent - (k + 1) * columnWidth);
+
+    void raw(int from, int to) {
+      for (int i = from; i < to; i++) {
+        final double v = data.value(i, column);
+        if (v.isNaN) {
+          out.breakSegment();
+        } else {
+          out.add(xs.toPixel(data.x(i)), ys.toPixel(v));
+        }
+      }
+    }
+
+    int row = start;
+    final int firstVisible = math.min(end, math.max(start, data.lowerBound(xs.min)));
+    raw(row, firstVisible);
+    row = firstVisible;
+    for (int k = 0; k < columns && row < end; k++) {
+      final int rowEnd = math.min(end, math.max(row, data.lowerBound(boundary(k))));
+      final int n = rowEnd - row;
+      if (n <= 0) continue;
+      if (n <= 4) {
+        raw(row, rowEnd);
+      } else {
+        // Many rows in a sliver narrower than the stroke. Stroking them all
+        // paints a solid block: as tall as their lowest and highest value,
+        // and as wide as the sliver plus the stroke. Trace that block's
+        // outline, entering at the first row and leaving at the last so
+        // neighbouring slivers stay connected.
+        final (double lo, double hi) = data.minMax(row, rowEnd, column: column);
+        if (lo > hi) {
+          out.breakSegment();
+        } else {
+          final double px0 = xs.toPixel(data.x(row));
+          final double px1 = xs.toPixel(data.x(rowEnd - 1));
+          final double first = data.value(row, column);
+          final double last = data.value(rowEnd - 1, column);
+          final bool lowFirst = first.isNaN || (first - lo).abs() <= (first - hi).abs();
+          final double near = ys.toPixel(lowFirst ? lo : hi);
+          final double far = ys.toPixel(lowFirst ? hi : lo);
+          if (!first.isNaN) out.add(px0, ys.toPixel(first));
+          out.add(px0, near);
+          out.add(px0, far);
+          out.add(px1, far);
+          out.add(px1, near);
+          if (!last.isNaN) out.add(px1, ys.toPixel(last));
+        }
+      }
+      row = rowEnd;
+    }
+    raw(row, end);
+  }
+
+  void _addSegment(ui.Path path, _Polyline line, int from, int to) {
+    path.moveTo(line.x(from), line.y(from));
+    switch (curve) {
+      case LineCurve.linear:
+        for (int i = from + 1; i < to; i++) {
+          path.lineTo(line.x(i), line.y(i));
+        }
+      case LineCurve.step:
+        for (int i = from + 1; i < to; i++) {
+          path.lineTo(line.x(i), line.y(i - 1));
+          path.lineTo(line.x(i), line.y(i));
+        }
+      case LineCurve.smooth:
+        if (to - from == 2) {
+          path.lineTo(line.x(from + 1), line.y(from + 1));
+          return;
+        }
+        double tangentAt(int i) {
+          if (i == from) {
+            return (line.y(i + 1) - line.y(i)) / _nonZero(line.x(i + 1) - line.x(i));
+          }
+          if (i == to - 1) {
+            return (line.y(i) - line.y(i - 1)) / _nonZero(line.x(i) - line.x(i - 1));
+          }
+          return _steffen(
+            line.x(i - 1),
+            line.y(i - 1), //
+            line.x(i),
+            line.y(i),
+            line.x(i + 1),
+            line.y(i + 1),
+          );
+        }
+
+        double m0 = tangentAt(from);
+        for (int i = from; i < to - 1; i++) {
+          final double m1 = tangentAt(i + 1);
+          final double h = line.x(i + 1) - line.x(i);
+          path.cubicTo(
+            line.x(i) + h / 3,
+            line.y(i) + m0 * h / 3, //
+            line.x(i + 1) - h / 3,
+            line.y(i + 1) - m1 * h / 3,
+            line.x(i + 1),
+            line.y(i + 1),
+          );
+          m0 = m1;
+        }
+    }
+  }
+
+  static double _nonZero(double v) => v == 0 ? 1e-9 : v;
+
+  static ui.Path _dashed(ui.Path source, List<double> pattern) {
+    final ui.Path result = ui.Path();
+    for (final ui.PathMetric metric in source.computeMetrics()) {
+      double distance = 0;
+      int index = 0;
+      while (distance < metric.length) {
+        final double length = math.max(0.5, pattern[index % pattern.length]);
+        if (index.isEven) {
+          result.addPath(
+            metric.extractPath(distance, math.min(metric.length, distance + length)),
+            Offset.zero,
+          );
+        }
+        distance += length;
+        index++;
+      }
+    }
+    return result;
+  }
+}
+
+// A growable list of pixel points split into segments (at data gaps).
+class _Polyline {
+  Float64List _points = Float64List(512);
+  int _count = 0;
+  final List<int> _starts = <int>[0];
+
+  int get length => _count;
+  bool get isEmpty => _count == 0;
+
+  double x(int i) => _points[i * 2];
+  double y(int i) => _points[i * 2 + 1];
+
+  void add(double x, double y) {
+    if (_count * 2 + 2 > _points.length) {
+      _points = Float64List(_points.length * 2)..setRange(0, _count * 2, _points);
+    }
+    _points[_count * 2] = x;
+    _points[_count * 2 + 1] = y;
+    _count++;
+  }
+
+  void breakSegment() {
+    if (_starts.last != _count) _starts.add(_count);
+  }
+
+  void forEachSegment(void Function(int from, int to) visit) {
+    for (int s = 0; s < _starts.length; s++) {
+      final int from = _starts[s];
+      final int to = s + 1 < _starts.length ? _starts[s + 1] : _count;
+      if (to > from) visit(from, to);
+    }
+  }
+
+  // Pulls far off-screen end points in along their segment, so rasterizers
+  // never see huge coordinates when zoomed deep into sparse data.
+  void clampEnds(double min, double max) {
+    forEachSegment((int from, int to) {
+      if (to - from < 2) return;
+      _clamp(from, from + 1, min, max);
+      _clamp(to - 1, to - 2, min, max);
+    });
+  }
+
+  void _clamp(int end, int neighbour, double min, double max) {
+    final double x0 = x(end);
+    final double bound = x0 < min ? min : (x0 > max ? max : x0);
+    if (bound == x0) return;
+    final double x1 = x(neighbour);
+    if (x1 == x0) return;
+    final double t = (bound - x0) / (x1 - x0);
+    if (t <= 0 || t >= 1) return;
+    _points[end * 2] = bound;
+    _points[end * 2 + 1] = y(end) + (y(neighbour) - y(end)) * t;
+  }
+}

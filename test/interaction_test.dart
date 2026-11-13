@@ -1,0 +1,367 @@
+import 'package:flutter/gestures.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:plot_twist/plot_twist.dart';
+
+import 'test_utils.dart';
+
+const ChartScale _x = LinearScale(range: FixedRange(0, 100));
+const ChartScale _y = LinearScale(range: FixedRange(0, 100));
+
+ChartData _line() => ChartData.generate(11, (int i) => (i * 10.0, i * 10.0));
+
+Widget _overlayHost(Widget chart) => Directionality(
+  textDirection: TextDirection.ltr,
+  child: MediaQuery(
+    data: const MediaQueryData(size: Size(800, 600)),
+    child: Overlay(
+      initialEntries: <OverlayEntry>[
+        OverlayEntry(
+          builder: (BuildContext context) => Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(width: 400, height: 300, child: chart),
+          ),
+        ),
+      ],
+    ),
+  ),
+);
+
+void main() {
+  testWidgets('hovering sets a snapped focus in data space; leaving clears it', (
+    WidgetTester tester,
+  ) async {
+    final ChartController c = ChartController();
+    addTearDown(c.dispose);
+    final ChartData data = _line();
+    await tester.pumpWidget(
+      host(
+        Chart(
+          controller: c,
+          x: _x,
+          y: _y,
+          children: <Widget>[
+            LineSeries(data: data, id: 'a', label: 'A'),
+            const ChartCrosshair(),
+          ],
+        ),
+      ),
+    );
+    final TestPointer mouse = TestPointer(1, PointerDeviceKind.mouse);
+    // 212 px of 400 is x = 53; the nearest point is at 50.
+    await tester.sendEventToBinding(mouse.hover(const Offset(212, 100)));
+    await tester.pump();
+    expect(c.focus.value?.x, 50);
+    final List<ChartHit> hits = c.hitsAt(c.focus.value!.x);
+    expect(hits.single.series?.label, 'A');
+    expect(hits.single.y, 50);
+
+    // The focus is data, so it survives a pan.
+    c.x.jumpTo(20, 120);
+    await tester.pump();
+    expect(c.focus.value?.x, 50);
+
+    await tester.sendEventToBinding(mouse.hover(const Offset(700, 500)));
+    await tester.pump();
+    expect(c.focus.value, isNull);
+  });
+
+  testWidgets('the tooltip is a widget that follows the data without rebuilding', (
+    WidgetTester tester,
+  ) async {
+    final ChartController c = ChartController();
+    addTearDown(c.dispose);
+    final ChartData data = _line();
+    int builds = 0;
+    await tester.pumpWidget(
+      host(
+        Chart(
+          controller: c,
+          x: _x,
+          y: _y,
+          children: <Widget>[
+            LineSeries(data: data),
+            ChartTooltip(
+              builder: (BuildContext context, List<ChartHit> hits) {
+                builds++;
+                return SizedBox(
+                  key: const Key('tip'),
+                  width: 60,
+                  height: 30,
+                  child: Text('${hits.first.y}'),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+    expect(find.byKey(const Key('tip')), findsNothing);
+
+    c.focus.value = const ChartFocus(x: 50);
+    await tester.pump();
+    expect(builds, 1);
+    expect(find.text('50.0'), findsOneWidget);
+    // Above the point (200, 150), 12 px away.
+    Rect rect = tester.getRect(find.byKey(const Key('tip')));
+    expect(rect.bottomCenter, const Offset(200, 138));
+
+    // Panning moves it with the point; the same data is under the focus, so
+    // the content is not rebuilt.
+    c.x.jumpTo(10, 110);
+    await tester.pump();
+    rect = tester.getRect(find.byKey(const Key('tip')));
+    expect(rect.bottomCenter.dx, moreOrLessEquals(160, epsilon: 1e-6));
+    expect(builds, 1);
+
+    // Near the top of the plot it flips below the point.
+    c.focus.value = const ChartFocus(x: 100);
+    await tester.pump();
+    rect = tester.getRect(find.byKey(const Key('tip')));
+    expect(rect.top, greaterThanOrEqualTo(0));
+    expect(builds, 2);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('an overlay tooltip escapes the chart and tracks its anchor in the same frame', (
+    WidgetTester tester,
+  ) async {
+    final ChartController c = ChartController();
+    addTearDown(c.dispose);
+    final ChartData data = _line();
+    await tester.pumpWidget(
+      _overlayHost(
+        Chart(
+          controller: c,
+          x: _x,
+          y: _y,
+          children: <Widget>[
+            LineSeries(data: data),
+            ChartTooltip(
+              overlay: true,
+              // Below and to the right of the point: at x=100,y=100 that is
+              // outside the 400x300 chart.
+              alignment: Alignment.topLeft,
+              offset: const Offset(8, 8),
+              builder: (BuildContext context, List<ChartHit> hits) =>
+                  const SizedBox(key: Key('tip'), width: 120, height: 40),
+            ),
+          ],
+        ),
+      ),
+    );
+    c.focus.value = const ChartFocus(x: 100);
+    await tester.pump();
+    Rect rect = tester.getRect(find.byKey(const Key('tip')));
+    // The point is at the top-right corner of the chart: (400, 0).
+    expect(rect.topLeft, const Offset(408, 8));
+    expect(rect.right, greaterThan(400), reason: 'drawn outside the chart');
+
+    c.x.jumpTo(50, 150);
+    await tester.pump();
+    rect = tester.getRect(find.byKey(const Key('tip')));
+    expect(rect.left, moreOrLessEquals(208, epsilon: 1e-6), reason: 'moved in the same frame');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('linked charts share a scale and a focus', (WidgetTester tester) async {
+    final ChartScaleController time = ChartScaleController();
+    final ValueNotifier<ChartFocus?> focus = ValueNotifier<ChartFocus?>(null);
+    final ChartController top = ChartController(x: time, focus: focus);
+    final ChartController bottom = ChartController(x: time, focus: focus);
+    addTearDown(top.dispose);
+    addTearDown(bottom.dispose);
+    addTearDown(time.dispose);
+    addTearDown(focus.dispose);
+    final ChartData a = _line();
+    final ChartData b = ChartData.generate(21, (int i) => (i * 10.0, 5.0));
+    final ChartGutterGroup gutter = ChartGutterGroup();
+    int externalBuilds = 0;
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Column(
+          children: <Widget>[
+            ListenableBuilder(
+              listenable: time,
+              builder: (BuildContext context, Widget? child) {
+                externalBuilds++;
+                return Text('${time.min.round()}..${time.max.round()}');
+              },
+            ),
+            SizedBox(
+              height: 200,
+              child: Chart(
+                controller: top,
+                y: const LinearScale(range: FixedRange(0, 1000000)),
+                left: <Widget>[ChartAxis(extent: ChartAxisExtent.shared(gutter))],
+                children: <Widget>[
+                  LineSeries(data: a),
+                  const ChartCrosshair(),
+                ],
+              ),
+            ),
+            SizedBox(
+              height: 200,
+              child: Chart(
+                controller: bottom,
+                y: const LinearScale(range: FixedRange(0, 10)),
+                left: <Widget>[ChartAxis(extent: ChartAxisExtent.shared(gutter))],
+                children: <Widget>[
+                  LineSeries(data: b),
+                  const ChartCrosshair(),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pump();
+    // The shared x scale fits the data of both charts.
+    expect(time.range, const ChartRange(0, 200));
+    expect(find.text('0..200'), findsOneWidget);
+    // Both plots start at the same x: the narrow axis matches the wide one.
+    expect(top.view!.chartRect.left, bottom.view!.chartRect.left);
+    expect(top.view!.chartRect.left, lessThan(-30));
+
+    time.jumpTo(50, 150);
+    await tester.pump();
+    expect(top.view!.x.min, 50);
+    expect(bottom.view!.x.min, 50);
+    expect(find.text('50..150'), findsOneWidget);
+    expect(externalBuilds, lessThan(6));
+
+    focus.value = ChartFocus(x: 100, source: top);
+    await tester.pump();
+    expect(bottom.hitsAt(100).single.y, 5);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('bar, scatter and line series share one plot with two y scales', (
+    WidgetTester tester,
+  ) async {
+    final ChartController c = ChartController();
+    addTearDown(c.dispose);
+    final ChartData rain = ChartData.fromValues(<double>[1, 4, 2, 0, 3]);
+    final ChartData temp = ChartData.fromValues(<double>[12, 15, 11, 9, 14]);
+    await tester.pumpWidget(
+      host(
+        Chart(
+          controller: c,
+          x: const BandScale(labels: <String>['Mon', 'Tue', 'Wed', 'Thu', 'Fri']),
+          y: const LinearScale(range: FitDataRange(padding: 0.1)),
+          scales: const <Object, ChartScale>{
+            'mm': LinearScale(range: FitDataRange(includeZero: true)),
+          },
+          left: const <Widget>[ChartAxis()],
+          right: const <Widget>[ChartAxis(scale: 'mm')],
+          bottom: const <Widget>[ChartAxis()],
+          children: <Widget>[
+            BarSeries(data: rain, yScale: 'mm', label: 'Rain'),
+            LineSeries(data: temp, label: 'Temp'),
+            ScatterSeries(data: temp),
+          ],
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+    // Bars reach half a band beyond the first and last category.
+    expect(c.x.range, const ChartRange(-0.5, 4.5));
+    expect(c.scale('mm').range, const ChartRange(0, 4));
+    expect(c.y.min, lessThan(9));
+    expect(find.text('Wed'), findsOneWidget);
+    expect(c.series.map((ChartSeries s) => s.label), <String?>['Rain', 'Temp', null]);
+    // A bar hit carries its rectangle.
+    final ChartHit bar = c.hitTest(Offset(c.view!.x.toPixel(1), 10)).first;
+    expect(bar.rect, isNotNull);
+    expect(bar.y, 4);
+  });
+
+  testWidgets('animated data morphs without rebuilding the series widget', (
+    WidgetTester tester,
+  ) async {
+    final ChartController c = ChartController();
+    addTearDown(c.dispose);
+    final ChartData week = ChartData.fromValues(<double>[10, 20, 30]);
+    final ChartData other = ChartData.fromValues(<double>[30, 20, 10, 40]);
+    int builds = 0;
+    Widget build(ChartData data) => host(
+      Chart(
+        controller: c,
+        children: <Widget>[
+          AnimatedChartData(
+            data: data,
+            animateOnMount: false,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.linear,
+            builder: (BuildContext context, ChartData animated) {
+              builds++;
+              return BarSeries(data: animated, id: 'bars');
+            },
+          ),
+        ],
+      ),
+    );
+    await tester.pumpWidget(build(week));
+    expect(c.seriesById('bars')!.valueAt(0), 10);
+    final int before = builds;
+
+    await tester.pumpWidget(build(other));
+    final int afterSwap = builds;
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(c.seriesById('bars')!.valueAt(0), moreOrLessEquals(20, epsilon: 1e-6));
+    // The new fourth bar is growing from the baseline.
+    expect(c.seriesById('bars')!.valueAt(3), moreOrLessEquals(20, epsilon: 1e-6));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(c.seriesById('bars')!.valueAt(0), 30);
+    expect(c.seriesById('bars')!.valueAt(3), 40);
+    expect(builds, afterSwap, reason: 'animation frames do not rebuild');
+    expect(afterSwap - before, 1);
+  });
+
+  testWidgets('the loader asks for more data near the edge and prepending does not jump', (
+    WidgetTester tester,
+  ) async {
+    final ChartController c = ChartController();
+    addTearDown(c.dispose);
+    final ChartData data = ChartData.generate(101, (int i) => (100.0 + i, i.toDouble()));
+    int loads = 0;
+    await tester.pumpWidget(
+      host(
+        Chart(
+          controller: c,
+          x: const LinearScale(range: FixedRange(150, 200)),
+          y: _y,
+          children: <Widget>[
+            LineSeries(data: data),
+            ChartLoader(
+              data: data,
+              prefetch: 0.5,
+              onLoadBefore: () async {
+                loads++;
+                final double first = data.x(0);
+                data.prependAll(
+                  List<double>.generate(50, (int i) => first - 50 + i),
+                  List<double>.filled(50, 1),
+                );
+                return first - 50 > 0;
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(loads, 0, reason: 'far from the loaded edge');
+
+    // Within half a window of the first loaded value (100).
+    c.x.jumpTo(110, 160);
+    await tester.pump();
+    await tester.pump();
+    expect(loads, 1);
+    expect(data.x(0), 50);
+    expect(c.x.range, const ChartRange(110, 160), reason: 'the view did not move');
+    expect(data.firstOrdinal, -50);
+  });
+}
