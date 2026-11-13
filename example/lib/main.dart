@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'demos/a01_viewport_inspector.dart';
@@ -216,8 +217,22 @@ final List<Demo> demos = <Demo>[
 
 void main() => runApp(const GalleryApp());
 
+/// The index of the demo a route such as `/a10` names, or null.
+int? demoIndexOf(String? route) {
+  final int index = demos.indexWhere((Demo demo) => demo.route == route);
+  return index < 0 ? null : index;
+}
+
 class GalleryApp extends StatelessWidget {
   const GalleryApp({super.key});
+
+  static Route<void> _route(String? name) {
+    final int? index = demoIndexOf(name);
+    return MaterialPageRoute<void>(
+      settings: RouteSettings(name: index == null ? '/' : name),
+      builder: (_) => Gallery(initial: index),
+    );
+  }
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -225,19 +240,41 @@ class GalleryApp extends StatelessWidget {
     debugShowCheckedModeBanner: false,
     theme: ThemeData(colorSchemeSeed: const Color(0xFF3F6FB5)),
     darkTheme: ThemeData(colorSchemeSeed: const Color(0xFF3F6FB5), brightness: Brightness.dark),
-    home: const Gallery(),
+    // On the web, a link such as `#/a10` opens that demo.
+    onGenerateInitialRoutes: (String name) => <Route<void>>[_route(name)],
+    onGenerateRoute: (RouteSettings settings) => _route(settings.name),
   );
 }
 
 class Gallery extends StatefulWidget {
-  const Gallery({super.key});
+  const Gallery({super.key, this.initial});
+
+  /// The index of the demo a link asked for, if any.
+  final int? initial;
 
   @override
   State<Gallery> createState() => _GalleryState();
 }
 
 class _GalleryState extends State<Gallery> {
-  int selected = 2;
+  late int selected = widget.initial ?? 2;
+
+  // On a narrow screen, a link to a demo opens that demo's page once.
+  late bool _openLinkedDemo = widget.initial != null;
+
+  void _select(int index) {
+    setState(() => selected = index);
+    SystemNavigator.routeInformationUpdated(uri: Uri(path: demos[index].route), replace: true);
+  }
+
+  void _open(Demo demo) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        settings: RouteSettings(name: demo.route),
+        builder: (_) => DemoPage(demo: demo),
+      ),
+    );
+  }
 
   Widget _list(BuildContext context, {required bool wide}) => ListView.builder(
     itemCount: demos.length,
@@ -248,14 +285,7 @@ class _GalleryState extends State<Gallery> {
         selected: wide && index == selected,
         leading: SizedBox(width: 32, child: Text(demo.id)),
         title: Text(demo.title),
-        onTap: () {
-          if (wide) {
-            setState(() => selected = index);
-          } else {
-            Navigator.of(context)
-                .push(MaterialPageRoute<void>(builder: (_) => DemoPage(demo: demo)));
-          }
-        },
+        onTap: () => wide ? _select(index) : _open(demo),
       );
     },
   );
@@ -265,6 +295,12 @@ class _GalleryState extends State<Gallery> {
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
         final bool wide = constraints.maxWidth >= 900;
+        if (!wide && _openLinkedDemo) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _open(demos[selected]);
+          });
+        }
+        _openLinkedDemo = false;
         if (!wide) {
           return Scaffold(
             appBar: AppBar(title: const Text('plot_twist')),

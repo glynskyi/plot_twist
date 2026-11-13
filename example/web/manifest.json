@@ -1,12 +1,12 @@
 {
-    "name": "plot_twist_example",
-    "short_name": "plot_twist_example",
+    "name": "plot_twist gallery",
+    "short_name": "plot_twist",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#FFFFFF",
+    "theme_color": "#3F6FB5",
+    "description": "26 live demos of plot_twist, composable charts for Flutter.",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {

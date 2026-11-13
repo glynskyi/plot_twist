@@ -1,58 +1,70 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
+    Replaced by the value of `--base-href` passed to `flutter build web`. The
+    published gallery is built with `--base-href /plot_twist/`.
   -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <title>plot_twist gallery · composable charts for Flutter</title>
+  <meta name="description" content="26 live demos of plot_twist, composable charts for Flutter: pan and zoom a million points, widgets as tooltips and axis labels, lazily loaded history, live data, linked charts and candlesticks.">
+  <link rel="canonical" href="https://glynskyi.github.io/plot_twist/">
 
-  <!--
-    Uncomment the tag below to lay the app out underneath the parts of the
-    screen that the device obstructs, such as a display cutout, the rounded
-    corners of the screen, or a home indicator.
+  <!-- Link previews -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="plot_twist">
+  <meta property="og:title" content="plot_twist gallery · composable charts for Flutter">
+  <meta property="og:description" content="26 live demos: a million-point line, widgets as tooltips and axis labels, lazily loaded history, live data, linked charts and candlesticks. Every demo is one file under 120 lines.">
+  <meta property="og:url" content="https://glynskyi.github.io/plot_twist/">
+  <meta property="og:image" content="https://glynskyi.github.io/plot_twist/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="A plot_twist chart in the gallery">
+  <meta name="twitter:card" content="summary_large_image">
 
-    Without it, the browser keeps the app clear of them, and `SafeArea` and
-    `MediaQuery.paddingOf` report no padding. With it, the app covers the whole
-    screen, and it is up to the app to keep its own content out of the way,
-    which is what `SafeArea` is for.
-  -->
-  <!-- <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"> -->
-
-  <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="plot_twist_example">
+  <meta name="apple-mobile-web-app-title" content="plot_twist">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
-
-  <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
-
-  <title>plot_twist_example</title>
   <link rel="manifest" href="manifest.json">
+
+  <style>
+    #loading {
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+      color: #3a3a3a;
+      max-width: 36rem;
+      margin: 18vh auto 0;
+      padding: 0 1rem;
+      text-align: center;
+    }
+    #loading h1 { font-size: 1.5rem; margin: 0 0 .5rem; }
+    #loading a { color: #3F6FB5; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #141414; }
+      #loading { color: #d6d6d6; }
+      #loading a { color: #9db9e8; }
+    }
+  </style>
 </head>
 <body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
-
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
+  <div id="loading">
+    <h1>plot_twist gallery</h1>
+    <p>Loading 26 live demos of composable charts for Flutter.</p>
+    <p>
+      <a href="https://github.com/glynskyi/plot_twist">Source on GitHub</a> ·
+      <a href="https://pub.dev/packages/plot_twist">plot_twist on pub.dev</a>
+    </p>
+  </div>
+  <script>
+    window.addEventListener('flutter-first-frame', function () {
+      var loading = document.getElementById('loading');
+      if (loading) loading.remove();
+    });
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

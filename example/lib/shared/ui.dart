@@ -2,6 +2,8 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:plot_twist/plot_twist.dart';
 
+import 'open_url.dart';
+
 /// Maps the Material theme onto the charts below. plot_twist itself has no
 /// Material dependency; this is all the glue an app needs.
 class MaterialChartTheme extends StatelessWidget {
@@ -70,6 +72,13 @@ class Demo {
   /// File name under `lib/demos/`.
   final String file;
   final WidgetBuilder builder;
+
+  /// The gallery's address for this demo; on the web, `#/a10` opens A10.
+  String get route => '/${id.toLowerCase()}';
+
+  /// Where the demo's source can be read on GitHub.
+  String get sourceUrl =>
+      'https://github.com/glynskyi/plot_twist/blob/main/example/lib/demos/$file';
 }
 
 /// The frame every demo is shown in: what it proves, the demo, and its source.
@@ -106,6 +115,13 @@ class DemoPage extends StatelessWidget {
     );
   }
 
+  Future<void> _openOnGitHub(BuildContext context) async {
+    final bool opened = await openUrl(demo.sourceUrl);
+    if (opened || !context.mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('Copied the link to ${demo.file} on GitHub')));
+  }
+
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
@@ -121,6 +137,11 @@ class DemoPage extends StatelessWidget {
                 onPressed: () => _showSource(context),
                 icon: const Icon(Icons.code, size: 18),
                 label: const Text('Source'),
+              ),
+              TextButton.icon(
+                onPressed: () => _openOnGitHub(context),
+                icon: const Icon(Icons.open_in_new, size: 18),
+                label: const Text('GitHub'),
               ),
             ],
           ),
