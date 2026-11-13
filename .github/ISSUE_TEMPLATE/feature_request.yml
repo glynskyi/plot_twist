@@ -1,0 +1,64 @@
+name: Feature request
+description: Something your charts need that plot_twist does not do yet.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Many needs are met by adding a child to a chart rather than by a new feature:
+        see "Extending a chart" in the README and the 26 demos in the
+        [gallery](https://glynskyi.github.io/plot_twist/). If one of them gets close,
+        say which and what is missing.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you building?
+      description: The app, the chart, and what the user should be able to do with it.
+    validations:
+      required: true
+  - type: dropdown
+    id: aspect
+    attributes:
+      label: Closest aspect
+      options:
+        - A1 Viewport controller
+        - A2 2D pan and zoom
+        - A3 Edge-crossing marker
+        - A4 Widgets as tooltips
+        - A5 Infinite history
+        - A6 Lazy widget markers
+        - A7 Widgets as axis labels
+        - A8 Custom series
+        - A9 Gestures that coexist
+        - A10 One million points
+        - A11 Mixed series, two Y axes
+        - A12 Crosshair as shared state
+        - A13 Auto-fit Y
+        - A14 Pluggable scales
+        - A15 Live data
+        - A16 Linked charts
+        - A17 Editable annotations
+        - A18 Accessibility
+        - A19 Animated transitions
+        - A20 Legend outside the chart
+        - A21 Non-Cartesian content
+        - A22 Data-driven styling
+        - A23 Navigator by composition
+        - A24 Many small charts
+        - A25 Export to PNG
+        - A26 Candlesticks
+        - A new chart type
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you tried
+      description: Code you wrote with the current API, and where it fell short.
+      render: dart
+  - type: textarea
+    id: elsewhere
+    attributes:
+      label: How other libraries do it (optional)
+      description: Links to APIs or screenshots that solve this well, on any platform.

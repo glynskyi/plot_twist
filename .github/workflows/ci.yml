@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  floor:
+    name: Package on Flutter 3.41 (oldest supported)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.41.2
+          channel: stable
+          cache: true
+      # The gallery needs Flutter 3.47 (material_ui), so only the package is resolved here.
+      - run: flutter pub get --no-example
+      - run: flutter analyze lib test
+      - run: flutter test --no-pub
+
+  latest:
+    name: Package and gallery on Flutter 3.50
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.50.0
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Format (source folders only, at 100 columns)
+        run: dart format --output=none --set-exit-if-changed lib test example/lib example/test example/test_driver
+      - run: flutter analyze
+      - run: flutter test
+      - name: Gallery (every demo runs, stays under 120 lines and uses only the public API)
+        working-directory: example
+        run: flutter test
+      - name: Publish dry run
+        run: dart pub publish --dry-run
+      - name: pub.dev score (fails on any lost point)
+        run: |
+          dart pub global activate pana
+          dart pub global run pana --exit-code-threshold 0 .

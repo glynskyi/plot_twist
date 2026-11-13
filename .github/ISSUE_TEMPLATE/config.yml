@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions and ideas
+    url: https://github.com/glynskyi/plot_twist/discussions
+    about: Ask how to build a chart, or share what you made with plot_twist.

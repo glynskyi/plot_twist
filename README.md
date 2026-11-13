@@ -1,6 +1,14 @@
 # plot_twist
 
-Composable charts for Flutter.
+[![pub package](https://img.shields.io/pub/v/plot_twist.svg)](https://pub.dev/packages/plot_twist)
+[![pub points](https://img.shields.io/pub/points/plot_twist)](https://pub.dev/packages/plot_twist/score)
+[![CI](https://github.com/glynskyi/plot_twist/actions/workflows/ci.yml/badge.svg)](https://github.com/glynskyi/plot_twist/actions/workflows/ci.yml)
+[![MIT license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/glynskyi/plot_twist/blob/main/LICENSE)
+
+Composable charts for Flutter. **[Try the live gallery](https://glynskyi.github.io/plot_twist/)**:
+26 demos, each one small file.
+
+![Daily candles with volume, zoomed out to thirteen years and back in, with a crosshair and a price tooltip](https://raw.githubusercontent.com/glynskyi/plot_twist/main/.github/media/hero.gif)
 
 A plot_twist chart is a `Stack` in data space. Series, grids, axes, tooltips
 and your own widgets are ordinary children that share one coordinate system.
@@ -23,7 +31,9 @@ instead of forking the library.
 - No dependencies beyond Flutter's widgets layer. The package does not
   import Material or Cupertino.
 
-Version 0.1.0 is the first public cut. The API can still change.
+Version 0.1.0 is the first public cut. The API can still change. To hear about
+new versions, watch the repository's releases on GitHub (Watch → Custom →
+Releases).
 
 ## Quick start
 
@@ -277,8 +287,8 @@ on the axis and a last candle that trades live.
 ## Performance
 
 These numbers come from `example/test_driver/perf_test.dart`, run in profile
-mode on macOS on Apple silicon. The figures are the 90th percentile of
-UI-thread frame time and raster time:
+mode on macOS on a MacBook Air with an Apple M4. The figures are the 90th
+percentile of UI-thread frame time and raster time:
 
 | Scenario | Frames | Build p90 | Raster p90 | Missed frames |
 |---|---|---|---|---|
@@ -300,7 +310,10 @@ No phone was measured, so mobile figures are unknown.
 ## Example gallery
 
 `example/` contains one small demo per aspect that chart libraries are judged
-on. Each demo is a single file that uses only the public API. Their sizes are
+on, and [runs in the browser](https://glynskyi.github.io/plot_twist/); every
+demo has its own link, such as
+[`#/a10`](https://glynskyi.github.io/plot_twist/#/a10). Each demo is a single
+file that uses only the public API. Their sizes are
 counted in non-blank, non-comment lines after `dart format` at 100 columns,
 and a test fails if any demo goes over 120 lines.
 

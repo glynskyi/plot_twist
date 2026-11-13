@@ -1,0 +1,52 @@
+name: Gallery
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.50.0
+          channel: stable
+          cache: true
+      - name: Build the gallery
+        working-directory: example
+        run: flutter build web --wasm --release --base-href /plot_twist/
+      # Cookie-less page counts for the published gallery only; the example in
+      # the package stays free of analytics. Set the repository variable
+      # GOATCOUNTER_CODE to the site code to turn it on.
+      - name: Add GoatCounter
+        if: ${{ vars.GOATCOUNTER_CODE != '' }}
+        working-directory: example/build/web
+        run: >-
+          sed -i
+          "s#</body>#<script data-goatcounter=\"https://${{ vars.GOATCOUNTER_CODE }}.goatcounter.com/count\" async src=\"https://gc.zgo.at/count.js\"></script></body>#"
+          index.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: example/build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

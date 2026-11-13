@@ -27,3 +27,21 @@ topics:
   - graph
   - data-visualization
   - candlestick
+
+screenshots:
+  - description: Candlesticks with volume on a second Y scale; the last candle trades live.
+    path: doc/screenshots/a26.png
+  - description: A tooltip that is a widget, with an avatar, a small chart and a button.
+    path: doc/screenshots/a04.png
+  - description: Bars, a line and floating min-max bars in one chart, on two Y axes.
+    path: doc/screenshots/a11.png
+  - description: A line of one million points that pans and zooms.
+    path: doc/screenshots/a10.png
+  - description: A dot where the line crosses the Y axis, with a value pill in the axis gutter.
+    path: doc/screenshots/a03.png
+  - description: Three linked charts that share one X window and one crosshair.
+    path: doc/screenshots/a16.png
+  - description: Photo pins that exist only while their data is visible.
+    path: doc/screenshots/a06.png
+  - description: Axis labels that are widgets, such as icons, two-line text and chips.
+    path: doc/screenshots/a07.png
