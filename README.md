@@ -76,6 +76,9 @@ to zoom, drag an axis to stretch it, and double-tap to reset. A chart with no
 behaviors allocates no recognizers or tickers, so 500 sparklines in a list
 stay cheap.
 
+Coming from fl_chart? [doc/coming_from_fl_chart.md](doc/coming_from_fl_chart.md)
+maps its concepts onto plot_twist and shows three charts written in both.
+
 ## How it works
 
 - **`ChartScale`** is configuration: a transform, a range policy (`fit`,
