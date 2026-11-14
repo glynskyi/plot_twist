@@ -45,6 +45,8 @@ jobs:
       - name: Publish dry run
         run: dart pub publish --dry-run
       - name: pub.dev score (fails on any lost point)
+        # pana checks the pubspec screenshots with the WebP tools; without them it scores 0/10.
         run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq webp
           dart pub global activate pana
           dart pub global run pana --exit-code-threshold 0 .
