@@ -29,7 +29,8 @@ Fixes. Nothing is removed or renamed.
   of `xScale` is followed.
 - `ChartPanZoom` removed while a finger is down releases its scales, which
   stayed marked as interacting, also on linked charts.
-- `AnimatedChartData` respects reduced motion on first show too.
+- `AnimatedChartData` respects reduced motion on first show too. Removing one
+  that never animated no longer fails an assertion (seen on Flutter 3.41).
 - An axis gutter that grew during a gesture shrinks when the gesture ends.
 - `ChartData.setValue` updates the min/max index instead of rebuilding it,
   which makes a live last candle cheap on large stores.

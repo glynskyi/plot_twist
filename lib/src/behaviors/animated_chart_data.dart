@@ -71,7 +71,11 @@ class _Snapshot {
 }
 
 class _AnimatedChartDataState extends State<AnimatedChartData> with SingleTickerProviderStateMixin {
-  late final AnimationController _animation = AnimationController(vsync: this)..addListener(_tick);
+  // Created for the first transition, so a chart that never animates (reduced
+  // motion, or data that never changes) never creates a ticker.
+  AnimationController? _controller;
+  AnimationController get _animation =>
+      _controller ??= AnimationController(vsync: this)..addListener(_tick);
   late ChartData _shown;
   late _Snapshot _from;
   late _Snapshot _to;
@@ -117,7 +121,7 @@ class _AnimatedChartDataState extends State<AnimatedChartData> with SingleTicker
   @override
   void dispose() {
     widget.data.removeListener(_retarget);
-    _animation.dispose();
+    _controller?.dispose();
     _shown.dispose();
     super.dispose();
   }
@@ -134,7 +138,7 @@ class _AnimatedChartDataState extends State<AnimatedChartData> with SingleTicker
     _to = _Snapshot(widget.data);
     final bool reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     if (reduceMotion || widget.duration == Duration.zero) {
-      _animation.stop();
+      _controller?.stop();
       _write(1);
       return;
     }

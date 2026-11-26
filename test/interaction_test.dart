@@ -629,6 +629,14 @@ void main() {
     await tester.pumpWidget(chart(reduceMotion: true));
     expect(c.seriesById('bars')!.valueAt(2), 30);
     expect(tester.hasRunningAnimations, isFalse);
+    // Taking down a chart that never animated is fine as well.
+    await tester.pumpWidget(const SizedBox());
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(chart(reduceMotion: true));
+    data.setValue(2, 40);
+    await tester.pump();
+    expect(c.seriesById('bars')!.valueAt(2), 40, reason: 'changes are not animated either');
+    data.setValue(2, 30);
 
     // Otherwise the first data set grows in from the baseline.
     await tester.pumpWidget(const SizedBox());
