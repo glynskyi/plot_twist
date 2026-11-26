@@ -126,20 +126,22 @@ class ChartTooltip extends StatelessWidget {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    if (hit.series?.color != null)
+                    if ((hit.color ?? hit.series?.color) != null)
                       Padding(
                         padding: const EdgeInsets.only(right: 6),
                         child: SizedBox.square(
                           dimension: 8,
                           child: DecoratedBox(
                             decoration: BoxDecoration(
-                              color: hit.series!.color,
+                              color: hit.color ?? hit.series!.color,
                               shape: BoxShape.circle,
                             ),
                           ),
                         ),
                       ),
-                    if (hit.series?.label != null) Text('${hit.series!.label}: '),
+                    // A slice of a pie has a name of its own.
+                    if ((hit.label ?? hit.series?.label) != null)
+                      Text('${hit.label ?? hit.series!.label}: '),
                     Text(ChartTicks.formatNumber(hit.value)),
                   ],
                 ),

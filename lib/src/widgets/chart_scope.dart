@@ -77,14 +77,17 @@ class ChartDockScope extends InheritedWidget {
 enum ChartAppearEffect {
   /// Grows along y from the zero line, or from the edge of the plot nearest
   /// to it. Right for columns and areas. Strokes are stretched while it
-  /// lasts.
+  /// lasts. In a polar chart the series grows out of the centre.
   growY,
 
   /// Grows along x from the zero line, or from the edge of the plot nearest
-  /// to it. Right for bars that lie.
+  /// to it. Right for bars that lie. In a polar chart the series grows out
+  /// of the centre.
   growX,
 
-  /// Is uncovered along the x scale, from its low end. Right for lines.
+  /// Is uncovered along the x scale, from its low end. Right for lines. In a
+  /// polar chart the series is uncovered around the centre, from the start
+  /// angle: right for a pie.
   reveal,
 
   /// Fades in.

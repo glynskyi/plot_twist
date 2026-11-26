@@ -43,6 +43,35 @@ class ChartCrosshair extends StatefulWidget {
   }) : vertical = vertical ?? mode != ChartHitMode.nearestY,
        horizontal = horizontal ?? mode == ChartHitMode.nearestY;
 
+  /// Tracks the single data point under the pointer and draws no lines.
+  ///
+  /// This is the crosshair for a polar chart, whose series are picked by
+  /// position: a slice of a pie, a bar of a gauge, a category of a radar
+  /// chart. It also suits a scatter plot that wants a tooltip and nothing
+  /// else. The focus is set while the pointer is on a data point, or within
+  /// [snapDistance] logical pixels of one.
+  ///
+  /// ```dart
+  /// PolarChart(children: [PieSeries(data: data), const ChartCrosshair.point(), const ChartTooltip()])
+  /// ```
+  const ChartCrosshair.point({
+    super.key,
+    this.xScale = kChartX,
+    this.yScale = kChartY,
+    this.snapDistance = 8,
+    this.showPoints = false,
+    this.hover = true,
+    this.longPress = true,
+    this.tap = false,
+    this.color,
+    this.pointRadius = 4,
+  }) : mode = ChartHitMode.nearest,
+       snap = true,
+       vertical = false,
+       horizontal = false,
+       width = 1,
+       dash = null;
+
   /// Id of the horizontal scale.
   final Object xScale;
 
@@ -294,9 +323,14 @@ class _CrosshairPainter extends ChartPainter {
       yScale: yScale,
       view: view,
     )) {
-      if (hit.rect != null) continue; // Bars are highlighted by their own shape.
+      // Bars and slices are highlighted by their own shape.
+      if (hit.rect != null || hit.sector != null) continue;
       canvas.drawCircle(hit.position, pointRadius + 1.5, Paint()..color = ring);
-      canvas.drawCircle(hit.position, pointRadius, Paint()..color = hit.series?.color ?? color);
+      canvas.drawCircle(
+        hit.position,
+        pointRadius,
+        Paint()..color = hit.color ?? hit.series?.color ?? color,
+      );
     }
   }
 

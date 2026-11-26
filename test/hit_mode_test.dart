@@ -253,6 +253,40 @@ void main() {
       expect(find.text('dots: '), findsNothing);
     });
 
+    testWidgets('ChartCrosshair.point follows the point under the pointer and draws no lines', (
+      WidgetTester tester,
+    ) async {
+      final ChartController c = ChartController();
+      addTearDown(c.dispose);
+      await tester.pumpWidget(
+        host(
+          Chart(
+            controller: c,
+            x: _x,
+            y: _y,
+            children: <Widget>[
+              ScatterSeries(data: _dots(), label: 'dots'),
+              const ChartCrosshair.point(),
+              const ChartTooltip(),
+            ],
+          ),
+        ),
+      );
+      final TestPointer mouse = TestPointer(1, PointerDeviceKind.mouse);
+      // 6 px from the dot at the pixel (200, 60): within the 8 px it snaps over.
+      await tester.sendEventToBinding(mouse.hover(const Offset(204, 64)));
+      await tester.pump();
+      expect(c.focus.value, ChartFocus(x: 50, y: 80, mode: ChartHitMode.nearest, source: c));
+      expect(find.text('dots: '), findsOneWidget);
+      expect(_lines(tester), isEmpty);
+      expect(_circles(tester), isEmpty, reason: 'no dot either, unless asked for');
+
+      // 14 px away is too far.
+      await tester.sendEventToBinding(mouse.hover(const Offset(210, 70)));
+      await tester.pump();
+      expect(find.text('dots: '), findsNothing);
+    });
+
     testWidgets('snapDistance also bounds the snap along x', (WidgetTester tester) async {
       final ChartController c = ChartController();
       addTearDown(c.dispose);

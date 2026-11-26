@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 
 import '../core/chart_controller.dart';
 import '../core/chart_view.dart';
+import '../core/polar.dart';
 import '../core/range.dart';
 import '../core/series.dart';
 import '../rendering/view_channel.dart';
@@ -190,6 +191,16 @@ abstract class ChartSeriesPainter extends ChartPainter {
   /// your own data labels. Return as soon as [visit] returns false: a layer
   /// that finds too many marks to label stops asking.
   void visitMarks(ChartView view, bool Function(ChartHit mark) visit) {}
+
+  /// The parts of the series that have a name and a colour of their own. A
+  /// legend shows one item for each. The default is none: the series is one
+  /// thing.
+  List<ChartSeriesEntry> get entries => const <ChartSeriesEntry>[];
+
+  /// The polar frame the series is drawn in, or null for a series on
+  /// straight axes. An appear animation grows such a series from the centre
+  /// of the circle and uncovers it around that centre.
+  ChartPolar? get polar => null;
 
   /// Whether the data extent may differ from [oldDelegate]'s. Defaults to
   /// [shouldRepaint].
@@ -525,7 +536,26 @@ class RenderChartPaint extends RenderBox with ChartViewDependent implements Char
       final ChartSeriesPainter series = _painter as ChartSeriesPainter;
       final ChartScaleView? xs = view.scales[series.xScale];
       final ChartScaleView? ys = view.scales[series.yScale];
+      final ChartPolarView? circle = series.polar?.resolve(view);
       switch (_appearEffect) {
+        case ChartAppearEffect.growY || ChartAppearEffect.growX when circle != null:
+          // Around a circle there is one way to grow: out of its centre.
+          canvas
+            ..translate(circle.center.dx, circle.center.dy)
+            ..scale(appeared, appeared)
+            ..translate(-circle.center.dx, -circle.center.dy);
+        case ChartAppearEffect.reveal when circle != null:
+          // Uncovered around the centre, from the start angle.
+          final double reach = view.size.longestSide + circle.radius * 2;
+          canvas.clipPath(
+            ChartSector(
+              center: circle.center,
+              innerRadius: 0,
+              outerRadius: reach,
+              startAngle: circle.polar.startAngle,
+              sweepAngle: circle.polar.sweepAngle * appeared,
+            ).toPath(),
+          );
         case ChartAppearEffect.growY:
           final double origin = _origin(ys, view.size.height);
           canvas
@@ -568,6 +598,12 @@ class RenderChartPaint extends RenderBox with ChartViewDependent implements Char
 
   @override
   Color? get color => _effectiveColor;
+
+  @override
+  List<ChartSeriesEntry> get entries {
+    final ChartPainter p = _painter;
+    return p is ChartSeriesPainter ? p.entries : const <ChartSeriesEntry>[];
+  }
 
   @override
   Object get xScale => (_painter as ChartSeriesPainter).xScale;

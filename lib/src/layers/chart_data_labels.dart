@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/widgets.dart';
 
 import '../../plot_twist.dart';
@@ -8,14 +10,18 @@ enum ChartDataLabelPosition {
   /// points up, below a bar that points down, beside the end of a bar that
   /// lies. Where the plot leaves no room there, the label moves inside the
   /// end of the bar, or below the point.
+  ///
+  /// In a polar chart, beyond the mark is away from the centre: outside the
+  /// rim of a slice, and further out than a corner of a radar chart.
   outside,
 
-  /// Inside a bar, at its end. A bar too small for its label has none. On a
-  /// point this is the same as [center].
+  /// Inside a bar, at its end, or inside a slice, at its rim. A bar or slice
+  /// too small for its label has none. On a point this is the same as
+  /// [center].
   inside,
 
-  /// In the middle of a bar, which suits the layers of a stack, or centred
-  /// on a point. A bar too small for its label has none.
+  /// In the middle of a bar or a slice, which suits the layers of a stack,
+  /// or centred on a point. A bar or slice too small for its label has none.
   center,
 }
 
@@ -27,7 +33,8 @@ enum ChartDataLabelPosition {
 ///
 /// It is an ordinary layer: put it after the series it labels. It asks each
 /// series for the data points it shows, so it works with bars in both
-/// directions, lines, scatter plots, candlesticks and any series that
+/// directions, lines, scatter plots, candlesticks, the slices of a pie, the
+/// bars of a gauge, the corners of a radar chart and any series that
 /// implements `ChartSeriesPainter.visitMarks`.
 ///
 /// The labels are painted, not built as widgets, and their text is laid out
@@ -102,6 +109,7 @@ class _ChartDataLabelsState extends State<ChartDataLabels> {
       clip: false,
       painter: _DataLabelsPainter(
         controller: controller,
+        polar: ChartPolarScope.maybeOf(context),
         cache: _cache,
         series: widget.series,
         format: widget.format,
@@ -161,6 +169,7 @@ class _LabelCache {
 class _DataLabelsPainter extends ChartPainter {
   _DataLabelsPainter({
     required this.controller,
+    required this.polar,
     required this.cache,
     required this.series,
     required this.format,
@@ -176,6 +185,9 @@ class _DataLabelsPainter extends ChartPainter {
   static const Color _dark = Color(0xFF1F1F1F);
 
   final ChartController controller;
+
+  // The frame of the polar chart the layer is in, if it is in one.
+  final ChartPolar? polar;
   final _LabelCache cache;
   final Object? series;
   final String? Function(ChartHit mark)? format;
@@ -203,6 +215,7 @@ class _DataLabelsPainter extends ChartPainter {
       if (tooMany) return;
     }
     final Rect plot = Offset.zero & view.size;
+    final Offset? centre = polar?.resolve(view).center;
     final Color outsideColor = style.color ?? _dark;
     final List<Rect> drawn = <Rect>[];
     for (final ChartHit mark in marks) {
@@ -211,14 +224,78 @@ class _DataLabelsPainter extends ChartPainter {
       // Measured in the colour of a label outside a bar; one inside may need
       // the other colour, which is the same size.
       final Size size = cache.painterFor(text, outsideColor).size;
-      final (Rect, bool)? placed = _place(mark, size, plot);
+      final ChartSector? sector = mark.sector;
+      final (Rect, bool)? placed = sector != null
+          ? _placeOnSector(sector, size, plot)
+          : centre != null
+          ? _placeAround(mark.position, centre, size, plot)
+          : _place(mark, size, plot);
       if (placed == null) continue;
       final (Rect rect, bool inside) = placed;
       if (hideOverlapping && drawn.any(rect.overlaps)) continue;
       drawn.add(rect);
-      final Color color = inside && contrast ? _colorOn(mark.series?.color) : outsideColor;
+      final Color color = inside && contrast
+          ? _colorOn(mark.color ?? mark.series?.color)
+          : outsideColor;
       cache.painterFor(text, color).paint(context.canvas, rect.topLeft);
     }
+  }
+
+  // Whether all of [rect] is on the plot.
+  static bool _within(Rect rect, Rect plot) =>
+      rect.left >= plot.left &&
+      rect.right <= plot.right &&
+      rect.top >= plot.top &&
+      rect.bottom <= plot.bottom;
+
+  // A label of [size] whose side facing against [away] touches [anchor].
+  static Rect _touching(Offset anchor, Offset away, Size size) => Rect.fromCenter(
+    center: anchor + Offset(away.dx * size.width / 2, away.dy * size.height / 2),
+    width: size.width,
+    height: size.height,
+  );
+
+  // Where a label of [size] goes on a slice or a bar around a circle, and
+  // whether that is inside it.
+  (Rect, bool)? _placeOnSector(ChartSector sector, Size size, Rect plot) {
+    final double angle = sector.middleAngle;
+    final Offset out = Offset(math.cos(angle), math.sin(angle));
+    bool fits(Rect rect) =>
+        sector.contains(rect.topLeft) &&
+        sector.contains(rect.topRight) &&
+        sector.contains(rect.bottomLeft) &&
+        sector.contains(rect.bottomRight);
+    final Rect beyond = _touching(sector.pointAt(angle, sector.outerRadius + padding), out, size);
+    final Rect within = _touching(sector.pointAt(angle, sector.outerRadius - padding), -out, size);
+    final Rect centred = Rect.fromCenter(
+      center: sector.middle,
+      width: size.width,
+      height: size.height,
+    );
+    return switch (position) {
+      ChartDataLabelPosition.outside =>
+        _within(beyond, plot) ? (beyond, false) : (fits(within) ? (within, true) : null),
+      ChartDataLabelPosition.inside => fits(within) ? (within, true) : null,
+      ChartDataLabelPosition.center => fits(centred) ? (centred, true) : null,
+    };
+  }
+
+  // Where a label of [size] goes for a point of a polar chart: beyond it is
+  // away from [centre].
+  (Rect, bool)? _placeAround(Offset point, Offset centre, Size size, Rect plot) {
+    final Offset d = point - centre;
+    final Offset out = d.distance > 0 ? d / d.distance : const Offset(0, -1);
+    final Rect beyond = _touching(point + out * padding, out, size);
+    final Rect result = switch (position) {
+      ChartDataLabelPosition.outside =>
+        _within(beyond, plot) ? beyond : _touching(point - out * padding, -out, size),
+      ChartDataLabelPosition.inside || ChartDataLabelPosition.center => Rect.fromCenter(
+        center: point,
+        width: size.width,
+        height: size.height,
+      ),
+    };
+    return _within(result, plot) ? (result, false) : null;
   }
 
   // White on a dark bar, dark on a light one.
@@ -289,6 +366,7 @@ class _DataLabelsPainter extends ChartPainter {
   @override
   bool shouldRepaint(_DataLabelsPainter oldDelegate) =>
       !identical(oldDelegate.controller, controller) ||
+      oldDelegate.polar != polar ||
       oldDelegate.series != series ||
       oldDelegate.format != format ||
       oldDelegate.position != position ||

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart' show Axis;
 
 import 'chart_view.dart';
+import 'polar.dart';
 import 'range.dart';
 
 /// How a pointer position is matched to data points.
@@ -12,7 +13,8 @@ enum ChartHitMode {
   /// bar charts and for crosshairs.
   nearestX,
 
-  /// The closest point by on-screen distance. Best for scatter plots.
+  /// The closest point by on-screen distance. Best for scatter plots, and
+  /// the mode the series of a polar chart answer to.
   nearest,
 
   /// The closest point along the y scale, one per series. Best for
@@ -58,8 +60,11 @@ class ChartHit {
     this.series,
     this.datum,
     this.rect,
+    this.sector,
     this.base,
     this.valueAxis = Axis.vertical,
+    this.label,
+    this.color,
   });
 
   /// The position of the data point on the horizontal scale.
@@ -86,6 +91,18 @@ class ChartHit {
   /// The on-screen rectangle of the mark (for bars and similar), if any.
   final Rect? rect;
 
+  /// The on-screen sector of the mark, for a slice of a pie or a bar that
+  /// runs around a circle.
+  final ChartSector? sector;
+
+  /// The name of the mark itself, when it has one: a slice of a pie. Other
+  /// marks go by the label of their [series].
+  final String? label;
+
+  /// The colour the mark is drawn in, when that is not the colour of its
+  /// [series]: a slice of a pie, or a bar coloured by its value.
+  final Color? color;
+
   /// The value the mark starts from, if it has one: the baseline of a bar, or
   /// the top of the layer below it in a stack. [value] minus [base] is then
   /// the size of the mark itself.
@@ -111,8 +128,11 @@ class ChartHit {
     series: series,
     datum: datum,
     rect: rect,
+    sector: sector,
     base: base,
     valueAxis: valueAxis,
+    label: label,
+    color: color,
   );
 
   /// Whether this hit refers to the same data point as [other], regardless of
@@ -157,6 +177,46 @@ class ChartHitSet {
       Object.hashAll(hits.map((ChartHit h) => Object.hash(h.series, h.index, h.x, h.y)));
 }
 
+/// A part of a series that has a name and a colour of its own: a slice of a
+/// pie. A legend shows one item for each instead of one for the series.
+@immutable
+class ChartSeriesEntry {
+  /// Creates an entry.
+  const ChartSeriesEntry({
+    required this.index,
+    required this.color,
+    this.label,
+    this.visible = true,
+  });
+
+  /// The row of the data the entry stands for.
+  final int index;
+
+  /// The colour the entry is drawn in.
+  final Color color;
+
+  /// The name of the entry. A legend leaves out entries without one.
+  final String? label;
+
+  /// Whether the entry is drawn. One that has no value to show is not, and
+  /// a legend dims it.
+  final bool visible;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ChartSeriesEntry &&
+      other.index == index &&
+      other.color == color &&
+      other.label == label &&
+      other.visible == visible;
+
+  @override
+  int get hashCode => Object.hash(index, color, label, visible);
+
+  @override
+  String toString() => 'ChartSeriesEntry(#$index, $label)';
+}
+
 /// A series registered with a chart: everything legends, tooltips, crosshairs
 /// and auto-ranging need to know about it.
 ///
@@ -184,6 +244,11 @@ abstract class ChartSeries {
   /// automatic ranges and can be hit, but no legend shows it and it takes no
   /// colour of the palette.
   bool get listed;
+
+  /// The parts of the series that have a name and a colour of their own, as
+  /// the slices of a pie do. Empty for a series that is one thing, which is
+  /// most of them.
+  List<ChartSeriesEntry> get entries;
 
   /// Id of the horizontal scale the series is plotted on.
   Object get xScale;
