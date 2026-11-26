@@ -361,6 +361,40 @@ class CandlestickSeriesPainter extends ChartSeriesPainter {
     if (i < 0) return;
     final ChartCandle? candle = candleAt(i);
     if (candle == null) return;
+    final Rect? rect = _boxOf(i, candle, xs, ys);
+    if (rect == null) return;
+    final Offset outside = Offset(
+      math.max(0, (query.position.dx - rect.center.dx).abs() - rect.width / 2),
+      math.max(0, (query.position.dy - rect.center.dy).abs() - rect.height / 2),
+    );
+    final double distance = query.mode == ChartHitMode.nearestX ? outside.dx : outside.distance;
+    if (distance > query.maxDistance) return;
+    hits.add(_hitOf(i, candle, rect, distance));
+  }
+
+  @override
+  void visitMarks(ChartView view, bool Function(ChartHit mark) visit) {
+    if (data.isEmpty || !view.scales.containsKey(xScale) || !view.scales.containsKey(yScale)) {
+      return;
+    }
+    final ChartScaleView xs = view.scale(xScale);
+    final ChartScaleView ys = view.scale(yScale);
+    final double half = _half;
+    final (int start, int end) = data.isSorted
+        ? data.indexRange(xs.min - half, xs.max + half, overscan: 0)
+        : (0, data.length);
+    for (int i = start; i < end; i++) {
+      final ChartCandle? candle = candleAt(i);
+      if (candle == null) continue;
+      final Rect? rect = _boxOf(i, candle, xs, ys);
+      if (rect == null) continue;
+      if (!visit(_hitOf(i, candle, rect, 0))) return;
+    }
+  }
+
+  // The box around the candle of row [i], from its low to its high, or null
+  // when the scales cannot show it.
+  Rect? _boxOf(int i, ChartCandle candle, ChartScaleView xs, ChartScaleView ys) {
     final double x = data.x(i);
     final double centre = xs.toPixel(x);
     final double half = _stepPixels(xs, x, centre, _step) * widthFactor / 2;
@@ -368,26 +402,18 @@ class CandlestickSeriesPainter extends ChartSeriesPainter {
       Offset(centre - half, ys.toPixel(candle.low)),
       Offset(centre + half, ys.toPixel(candle.high)),
     );
-    // A candle the scales cannot show is not on the chart.
-    if (!rect.isFinite) return;
-    final Offset outside = Offset(
-      math.max(0, (query.position.dx - rect.center.dx).abs() - rect.width / 2),
-      math.max(0, (query.position.dy - rect.center.dy).abs() - rect.height / 2),
-    );
-    final double distance = query.mode == ChartHitMode.nearestX ? outside.dx : outside.distance;
-    if (distance > query.maxDistance) return;
-    hits.add(
-      ChartHit(
-        x: x,
-        y: candle.close,
-        position: rect.topCenter,
-        distance: distance,
-        index: i,
-        datum: candle,
-        rect: rect,
-      ),
-    );
+    return rect.isFinite ? rect : null;
   }
+
+  ChartHit _hitOf(int i, ChartCandle candle, Rect rect, double distance) => ChartHit(
+    x: data.x(i),
+    y: candle.close,
+    position: rect.topCenter,
+    distance: distance,
+    index: i,
+    datum: candle,
+    rect: rect,
+  );
 
   @override
   bool hitTest(Offset position, ChartView view) => false;

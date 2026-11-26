@@ -330,29 +330,54 @@ class BarSeriesPainter extends ChartSeriesPainter {
     final double pointer = _horizontal ? query.position.dy : query.position.dx;
     final int i = data.nearestIndex(along.toValue(pointer) - offset);
     if (i < 0) return;
-    final double value = data.value(i, column);
-    final Rect? rect = _rectOf(i, value, along, across, _half);
+    final Rect? rect = _rectOf(i, data.value(i, column), along, across, _half);
     if (rect == null) return;
-    final double centre = along.toPixel(data.x(i) + offset);
-    final double end = across.toPixel(value);
-    final Offset position = _horizontal ? Offset(end, centre) : Offset(centre, end);
+    final Offset position = _tipOf(i, along, across);
     final double thickness = _horizontal ? rect.height : rect.width;
     final double middle = _horizontal ? rect.center.dy : rect.center.dx;
     final double distance = query.mode == ChartHitMode.nearest
         ? (rect.contains(query.position) ? 0 : (position - query.position).distance)
         : math.max(0, (pointer - middle).abs() - thickness / 2);
     if (distance > query.maxDistance) return;
-    hits.add(
-      ChartHit(
-        x: _horizontal ? value : data.x(i),
-        y: _horizontal ? data.x(i) : value,
-        position: position,
-        distance: distance,
-        index: i,
-        rect: rect,
-        base: _base(i),
-        valueAxis: direction,
-      ),
+    hits.add(_hitOf(i, rect, position, distance));
+  }
+
+  @override
+  void visitMarks(ChartView view, bool Function(ChartHit mark) visit) {
+    if (data.isEmpty || !view.scales.containsKey(xScale) || !view.scales.containsKey(yScale)) {
+      return;
+    }
+    final ChartScaleView along = view.scale(_argumentScale);
+    final ChartScaleView across = view.scale(_valueScale);
+    final double half = _half;
+    final (int start, int end) = data.isSorted
+        ? data.indexRange(along.min - offset - half, along.max - offset + half, overscan: 0)
+        : (0, data.length);
+    for (int i = start; i < end; i++) {
+      final Rect? rect = _rectOf(i, data.value(i, column), along, across, half);
+      if (rect == null) continue;
+      if (!visit(_hitOf(i, rect, _tipOf(i, along, across), 0))) return;
+    }
+  }
+
+  // Where the value of row [i] is drawn: the middle of the end of its bar.
+  Offset _tipOf(int i, ChartScaleView along, ChartScaleView across) {
+    final double centre = along.toPixel(data.x(i) + offset);
+    final double end = across.toPixel(data.value(i, column));
+    return _horizontal ? Offset(end, centre) : Offset(centre, end);
+  }
+
+  ChartHit _hitOf(int i, Rect rect, Offset position, double distance) {
+    final double value = data.value(i, column);
+    return ChartHit(
+      x: _horizontal ? value : data.x(i),
+      y: _horizontal ? data.x(i) : value,
+      position: position,
+      distance: distance,
+      index: i,
+      rect: rect,
+      base: _base(i),
+      valueAxis: direction,
     );
   }
 

@@ -51,6 +51,15 @@ The painters of the three series are renamed in the same way.
 - `CandlestickSeries(style:)`: `CandleStyle.hollow` outlines the candles that
   close at or above their open, `CandleStyle.ohlc` draws OHLC bars. Both are
   still two draw calls per frame.
+- `ChartDataLabels`: a layer that writes the value next to every visible
+  data point of bars in both directions, lines, scatter plots and
+  candlesticks, with `format`, `position` (outside, inside or centred),
+  overlap hiding and a limit (`maxLabels`, 250) above which it draws none.
+  A series of your own gets labels by overriding
+  `ChartSeriesPainter.visitMarks`.
+- `ChartController.seriesRepaint`: notifies at once when a series changes
+  what it shows, as the `repaint` of a painter that draws what the series
+  show.
 - Horizontal bars: `BarSeries(direction: Axis.horizontal)`. The rows run
   along the vertical scale and the values along the horizontal one; stacks,
   offsets, rounded ends and per-bar colours work as for columns. Use

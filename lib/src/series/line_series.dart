@@ -409,6 +409,32 @@ class LineSeriesPainter extends ChartSeriesPainter {
     if (best != null) hits.add(best);
   }
 
+  @override
+  void visitMarks(ChartView view, bool Function(ChartHit mark) visit) {
+    if (data.isEmpty || !view.scales.containsKey(xScale) || !view.scales.containsKey(yScale)) {
+      return;
+    }
+    final ChartScaleView xs = view.scale(xScale);
+    final ChartScaleView ys = view.scale(yScale);
+    final (int start, int end) = data.isSorted
+        ? data.indexRange(xs.min, xs.max, overscan: 0)
+        : (0, data.length);
+    final int? lower = baseColumn;
+    for (int i = start; i < end; i++) {
+      final Offset? position = _pixelOf(i, xs, ys);
+      if (position == null) continue;
+      final ChartHit mark = ChartHit(
+        x: data.x(i),
+        y: data.value(i, column),
+        position: position,
+        distance: 0,
+        index: i,
+        base: lower == null ? null : data.value(i, lower),
+      );
+      if (!visit(mark)) return;
+    }
+  }
+
   // --------------------------------------------------------------- paint
 
   @override

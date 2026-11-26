@@ -181,6 +181,16 @@ abstract class ChartSeriesPainter extends ChartPainter {
   /// Adds the data points matching [query] to [hits].
   void collectHits(ChartHitQuery query, List<ChartHit> hits) {}
 
+  /// Calls [visit] with every data point the series shows in [view], until
+  /// [visit] returns false. The default visits none.
+  ///
+  /// A mark is a [ChartHit] at a distance of zero: its `position` is where
+  /// the value is drawn and its `rect`, for a bar, the bar. `ChartDataLabels`
+  /// puts a label on each, so implementing this is what gives a series of
+  /// your own data labels. Return as soon as [visit] returns false: a layer
+  /// that finds too many marks to label stops asking.
+  void visitMarks(ChartView view, bool Function(ChartHit mark) visit) {}
+
   /// Whether the data extent may differ from [oldDelegate]'s. Defaults to
   /// [shouldRepaint].
   bool shouldRescale(covariant ChartSeriesPainter oldDelegate) => shouldRepaint(oldDelegate);
@@ -506,5 +516,15 @@ class RenderChartPaint extends RenderBox with ChartViewDependent implements Char
   void collectHits(ChartHitQuery query, List<ChartHit> hits) {
     final ChartPainter p = _painter;
     if (_visible && p is ChartSeriesPainter) p.collectHits(query, hits);
+  }
+
+  @override
+  void visitMarks(ChartView view, bool Function(ChartHit mark) visit) {
+    final ChartPainter p = _painter;
+    if (!_visible || p is! ChartSeriesPainter) return;
+    p.visitMarks(
+      view,
+      (ChartHit mark) => visit(mark.series == null ? mark.withSeries(this) : mark),
+    );
   }
 }

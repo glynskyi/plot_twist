@@ -204,4 +204,9 @@ abstract class ChartSeries {
 
   /// Adds the data points matching [query] to [hits].
   void collectHits(ChartHitQuery query, List<ChartHit> hits);
+
+  /// Calls [visit] with every data point the series shows in [view], each as
+  /// a hit at a distance of zero, until [visit] returns false. This is what
+  /// data labels are attached to. A hidden series has none.
+  void visitMarks(ChartView view, bool Function(ChartHit mark) visit);
 }

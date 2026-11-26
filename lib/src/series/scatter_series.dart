@@ -215,6 +215,24 @@ class ScatterSeriesPainter extends ChartSeriesPainter {
   }
 
   @override
+  void visitMarks(ChartView view, bool Function(ChartHit mark) visit) {
+    if (data.isEmpty || !view.scales.containsKey(xScale) || !view.scales.containsKey(yScale)) {
+      return;
+    }
+    final ChartScaleView xs = view.scale(xScale);
+    final ChartScaleView ys = view.scale(yScale);
+    final (int start, int end) = _rows(ChartRange.of(xs.min, xs.max));
+    for (int i = start; i < end; i++) {
+      final double y = data.value(i, column);
+      if (y.isNaN) continue;
+      final Offset position = Offset(xs.toPixel(data.x(i)), ys.toPixel(y));
+      if (!position.isFinite) continue;
+      final ChartHit mark = ChartHit(x: data.x(i), y: y, position: position, distance: 0, index: i);
+      if (!visit(mark)) return;
+    }
+  }
+
+  @override
   void paint(ChartPaintContext context) {
     final ChartView view = context.view;
     if (data.isEmpty || !view.scales.containsKey(xScale) || !view.scales.containsKey(yScale)) {

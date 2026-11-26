@@ -70,6 +70,10 @@ class _DeferredNotifier extends ChangeNotifier {
   }
 }
 
+class _RepaintNotifier extends ChangeNotifier {
+  void notify() => notifyListeners();
+}
+
 /// The handle to a chart's state: its scales, its series and what the user is
 /// pointing at.
 ///
@@ -101,6 +105,7 @@ class ChartController {
   final Set<ChartScaleController> _owned = <ChartScaleController>{};
   final List<ChartSeries> _series = <ChartSeries>[];
   final _DeferredNotifier _seriesNotifier = _DeferredNotifier();
+  final _RepaintNotifier _repaintNotifier = _RepaintNotifier();
   final List<VoidCallback> _renderListeners = <VoidCallback>[];
   final List<TickerProvider> _vsyncs = <TickerProvider>[];
   final bool _ownsFocus;
@@ -208,6 +213,15 @@ class ChartController {
   /// Notifies when series are added, removed or change their data or metadata.
   Listenable get seriesListenable => _seriesNotifier;
 
+  /// Notifies at once when a series is added, removed or changes what it
+  /// shows: the `repaint` listenable for a painter that draws what the
+  /// series show, such as data labels.
+  ///
+  /// Unlike [seriesListenable] it may fire while widgets are being built or
+  /// laid out, so a listener must only ask for a repaint, never call
+  /// `setState`.
+  Listenable get seriesRepaint => _repaintNotifier;
+
   /// The first series registered with [id], or null. This also finds a
   /// series that is not listed.
   ChartSeries? seriesById(Object id) {
@@ -305,6 +319,7 @@ class ChartController {
       _propagating = false;
     }
     _notifyRender();
+    _repaintNotifier.notify();
     _seriesNotifier.notify();
   }
 
@@ -496,6 +511,7 @@ class ChartController {
     }
     if (_ownsFocus) focus.dispose();
     _seriesNotifier.dispose();
+    _repaintNotifier.dispose();
     _renderListeners.clear();
     _series.clear();
   }
