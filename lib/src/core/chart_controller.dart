@@ -107,6 +107,7 @@ class ChartController {
   ChartView? _view;
   bool _propagating = false;
   bool _seriesOrderDirty = false;
+  bool _listingChanged = false;
   int _revision = 0;
   bool _disposed = false;
 
@@ -199,13 +200,16 @@ class ChartController {
   /// the first one is at the bottom.
   ///
   /// The order is settled by the layout of the chart. Until then, a series
-  /// added on a rebuild comes last.
-  List<ChartSeries> get series => List<ChartSeries>.unmodifiable(_series);
+  /// added on a rebuild comes last. Layers that are not listed
+  /// (`ChartPaint.listed`), such as reference lines, are left out.
+  List<ChartSeries> get series =>
+      List<ChartSeries>.unmodifiable(_series.where((ChartSeries s) => s.listed));
 
   /// Notifies when series are added, removed or change their data or metadata.
   Listenable get seriesListenable => _seriesNotifier;
 
-  /// The first series registered with [id], or null.
+  /// The first series registered with [id], or null. This also finds a
+  /// series that is not listed.
   ChartSeries? seriesById(Object id) {
     for (final ChartSeries s in _series) {
       if (s.id == id) return s;
@@ -252,7 +256,8 @@ class ChartController {
     for (final ChartSeries s in _series) {
       if (!placed.contains(s)) next.add(s);
     }
-    bool moved = false;
+    bool moved = _listingChanged;
+    _listingChanged = false;
     for (int i = 0; i < next.length && !moved; i++) {
       moved = !identical(next[i], _series[i]);
     }
@@ -264,9 +269,25 @@ class ChartController {
     return true;
   }
 
+  /// Reports that [series] started or stopped being listed, which moves the
+  /// series after it along the palette.
+  @internal
+  void seriesListingChanged(ChartSeries series) {
+    _seriesOrderDirty = true;
+    _listingChanged = true;
+    _seriesChanged();
+  }
+
   /// The place of [series] in [ChartController.series], or -1.
   @internal
-  int seriesIndex(ChartSeries series) => _series.indexOf(series);
+  int seriesIndex(ChartSeries series) {
+    int index = 0;
+    for (final ChartSeries s in _series) {
+      if (identical(s, series)) return s.listed ? index : -1;
+      if (s.listed) index++;
+    }
+    return -1;
+  }
 
   /// Reports that the data or metadata of [series] changed.
   @internal

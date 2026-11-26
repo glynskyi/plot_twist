@@ -51,6 +51,12 @@ The painters of the three series are renamed in the same way.
 - `CandlestickSeries(style:)`: `CandleStyle.hollow` outlines the candles that
   close at or above their open, `CandleStyle.ohlc` draws OHLC bars. Both are
   still two draw calls per frame.
+- `ChartReferenceLine.y(value)` and `.x(value)`: a line across the plot at a
+  threshold, a target or an average, with an optional dash pattern and a
+  label widget that follows the line. `includeInRange` widens automatic
+  ranges to show it.
+- `ChartPaint(listed: false)`, for a helper layer that counts for automatic
+  ranges but is no series to a legend. `ChartSeries.listed` reports it.
 - Minor ticks: `LinearTicks(minorCount:)`, `LogTicks(minor:)` and
   `BandTicks(minor:)`. An axis draws a short mark at each
   (`ChartAxis.minorTickLength`), and `ChartGrid(minor: true)` a fainter line.

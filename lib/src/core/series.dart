@@ -178,6 +178,13 @@ abstract class ChartSeries {
   /// legend can still list it — but is not painted, hit or auto-ranged.
   bool get visible;
 
+  /// Whether the series is one of `ChartController.series`.
+  ///
+  /// A helper layer, such as a reference line, is not: it still counts for
+  /// automatic ranges and can be hit, but no legend shows it and it takes no
+  /// colour of the palette.
+  bool get listed;
+
   /// Id of the horizontal scale the series is plotted on.
   Object get xScale;
 

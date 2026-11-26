@@ -199,12 +199,18 @@ class ChartPaint extends LeafRenderObjectWidget {
     this.label,
     this.color,
     this.visible = true,
+    this.listed = true,
     this.clip = true,
     this.isolate = true,
   });
 
   /// The delegate that paints the layer.
   final ChartPainter painter;
+
+  /// Whether the series is one of `ChartController.series`. Turn it off for
+  /// a helper layer that should widen automatic ranges or be hit, but that
+  /// no legend should show: it then takes no colour of the palette either.
+  final bool listed;
 
   /// Whether the layer is shown. A hidden series stays in
   /// `ChartController.series` but is not painted, hit or auto-ranged.
@@ -243,6 +249,7 @@ class ChartPaint extends LeafRenderObjectWidget {
       color: color,
       palette: ChartTheme.of(context).palette,
       visible: visible,
+      listed: listed,
       clip: clip,
       isolate: isolate,
     );
@@ -258,6 +265,7 @@ class ChartPaint extends LeafRenderObjectWidget {
       ..setMetadata(id: id, label: label, color: color)
       ..palette = ChartTheme.of(context).palette
       ..visible = visible
+      ..listed = listed
       ..clip = clip
       ..isolate = isolate;
   }
@@ -275,6 +283,7 @@ class RenderChartPaint extends RenderBox with ChartViewDependent implements Char
     Color? color,
     List<Color> palette = ChartThemeData.defaultPalette,
     bool visible = true,
+    bool listed = true,
     bool clip = true,
     bool isolate = true,
   }) : _painter = painter,
@@ -284,6 +293,7 @@ class RenderChartPaint extends RenderBox with ChartViewDependent implements Char
        _color = color,
        _palette = palette,
        _visible = visible,
+       _listed = listed,
        _clip = clip,
        _isolate = isolate {
     this.channel = channel;
@@ -373,6 +383,16 @@ class RenderChartPaint extends RenderBox with ChartViewDependent implements Char
     _visible = value;
     markNeedsPaint();
     if (attached && _painter is ChartSeriesPainter) _controller.seriesChanged(this);
+  }
+
+  @override
+  bool get listed => _listed;
+  bool _listed;
+  set listed(bool value) {
+    if (value == _listed) return;
+    _listed = value;
+    markNeedsPaint();
+    if (attached && _painter is ChartSeriesPainter) _controller.seriesListingChanged(this);
   }
 
   /// Whether painting is clipped to the plot area.
