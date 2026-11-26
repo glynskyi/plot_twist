@@ -23,6 +23,7 @@ export 'src/interaction/pan_zoom_recognizer.dart';
 export 'src/interaction/pointer_hub.dart';
 export 'src/layers/chart_data_labels.dart';
 export 'src/layers/chart_grid.dart';
+export 'src/layers/chart_legend.dart';
 export 'src/layers/chart_reference_line.dart';
 export 'src/rendering/render_chart_axis.dart';
 export 'src/rendering/render_chart_layout.dart';

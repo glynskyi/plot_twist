@@ -51,6 +51,10 @@ The painters of the three series are renamed in the same way.
 - `CandlestickSeries(style:)`: `CandleStyle.hollow` outlines the candles that
   close at or above their open, `CandleStyle.ohlc` draws OHLC bars. Both are
   still two draw calls per frame.
+- `ChartLegend`: the colour and label of every series, for a side slot of
+  the chart or anywhere else with the chart's controller. It is complete on
+  the first frame, wraps, dims hidden series and reports taps
+  (`onSeriesTap`), so your state keeps deciding which series is visible.
 - `ChartDataLabels`: a layer that writes the value next to every visible
   data point of bars in both directions, lines, scatter plots and
   candlesticks, with `format`, `position` (outside, inside or centred),
