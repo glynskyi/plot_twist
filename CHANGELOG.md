@@ -1,3 +1,47 @@
+## 0.1.1
+
+Fixes. Nothing is removed or renamed.
+
+- Log scales: a log axis no longer gets stuck on the window 1 to 10 when the
+  data, a bar's baseline of 0 or `includeZero` brings in a value of zero or
+  less. Such values are missing data: automatic ranges leave them out, lines
+  break there, and bars and filled areas grow from the edge of the plot. The
+  fitted window reaches to the next power of the base below the smallest
+  value, so the smallest bar still has a length.
+- Infinite values are missing data as well. One of them used to send every
+  automatic range to its fallback.
+- `LineSeries`: zoomed far into sparse data, a stepped line and its fill drew
+  the first run at the wrong height. A smooth line changed shape at the plot
+  edges while panning, was drawn straight between two rows that bracket the
+  window, and did not match `valueAt`.
+- `LineSeries.dash` is compared by value, so a list written in `build` no
+  longer repaints the series on every rebuild.
+- `TimeTicks`: steps of one and two weeks fall on Mondays instead of
+  Thursdays. In local time, steps of several days stay at midnight and steps
+  of 3, 6 and 12 hours stay on the clock grid across a daylight saving change.
+- Ticks set on a scale or an axis to change a spacing or a format keep what
+  the scale knows: UTC on a UTC `TimeScale`, the base of a `LogScale`, the
+  labels of a `BandScale`.
+- `ChartLoader`: a failed load is reported to the new `onError` (or through
+  `FlutterError.reportError`) and tried again when the window or the data
+  changes; it used to leave that side loading for good. A load that says
+  there is more but adds nothing is no longer repeated without end. A change
+  of `xScale` is followed.
+- `ChartPanZoom` removed while a finger is down releases its scales, which
+  stayed marked as interacting, also on linked charts.
+- `AnimatedChartData` respects reduced motion on first show too.
+- An axis gutter that grew during a gesture shrinks when the gesture ends.
+- `ChartData.setValue` updates the min/max index instead of rebuilding it,
+  which makes a live last candle cheap on large stores.
+- `FixedRange`, `FollowRange`, `LogScale` and `ChartLimits` assert
+  configurations that cannot work, such as a range the wrong way round or a
+  logarithm base of 1. In release builds such values no longer throw later.
+
+New, for custom scales and series: `ChartScale.domain`,
+`ChartScale.resolveTicks`, `ChartData.valueExtent(within:)` and
+`ChartData.xExtentWithin`. A series' `bounds` should leave out values outside
+the window it is given in each dimension, as the built-in ones now do.
+
 ## 0.1.0
 
 First release.

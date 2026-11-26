@@ -6,7 +6,7 @@ time.
 
 The fl_chart names on this page were verified against fl_chart 1.3.1 on
 13 November 2026, and its three examples compile against that version. The
-plot_twist examples compile against plot_twist 0.1.0.
+plot_twist examples compile against plot_twist 0.1.1.
 
 ## The differences that matter most
 

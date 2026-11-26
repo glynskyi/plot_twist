@@ -79,7 +79,9 @@ class ChartData extends ChangeNotifier {
   ///
   /// Returns one store per layer with two value columns: column 0 is the top
   /// of the layer and column 1 its bottom — ready for a bar series with
-  /// `baseColumn: 1`, or an area between two lines.
+  /// `baseColumn: 1`. A missing value (NaN) counts as 0, and negative values
+  /// are added to the same running total as positive ones. The result is a
+  /// copy: it does not follow later changes to [layers].
   static List<ChartData> stacked(List<ChartData> layers) {
     final List<ChartData> result = <ChartData>[];
     List<double>? running;

@@ -521,8 +521,10 @@ the crosshair and tooltip already follow.
 
 **Demo.** A 12-bar chart with all three. A widget test checks that the nodes
 exist, sit on their bars and focus their bar when activated, and that the
-arrow keys move the focus. It was not tried with VoiceOver or TalkBack. The
-package does not read `MediaQuery.disableAnimations`.
+arrow keys move the focus. It was not tried with VoiceOver or TalkBack.
+`AnimatedChartData` skips its transitions when `MediaQuery.disableAnimations`
+is set; animated window changes (`animateTo`, `resetToAuto` with a duration)
+and flings do not read it.
 
 ## A19. Animated transitions
 
@@ -743,5 +745,5 @@ quoted under A10.
 4. Widgets should be real children of a custom multi-child render object:
    placed during layout from data coordinates, built lazily, and laid out
    again instead of rebuilt during a pan.
-5. The core should stay small. plot_twist has about 9,600 lines and depends on
+5. The core should stay small. plot_twist has about 10,200 lines and depends on
    nothing but Flutter.

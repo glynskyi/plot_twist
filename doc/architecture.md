@@ -285,5 +285,5 @@ lib/src/layers/          the grid                 (public API only)
 lib/src/behaviors/       pan and zoom, crosshair, tooltip, loader, animated data  (public API only)
 ```
 
-The package is about 9,600 lines of Dart and has no dependencies besides
+The package is about 10,200 lines of Dart and has no dependencies besides
 Flutter.

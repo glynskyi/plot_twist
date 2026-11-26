@@ -186,7 +186,9 @@ class ChartController {
 
   // ---------------------------------------------------------------- series
 
-  /// The series currently in the chart, in paint order.
+  /// The series currently in the chart, in the order they were added to it.
+  ///
+  /// A series added on a rebuild comes last, wherever it is painted.
   List<ChartSeries> get series => List<ChartSeries>.unmodifiable(_series);
 
   /// Notifies when series are added, removed or change their data or metadata.
