@@ -10,8 +10,8 @@ typedef ChartBarColor = Color? Function(int index, double x, double y);
 
 /// Vertical bars, one per row of a [ChartData].
 ///
-/// Each bar is centred on its x value (plus [offset]) and is [width] × [step]
-/// data units wide. It spans from [baseline] — or from the value in
+/// Each bar is centred on its x value (plus [offset]) and is [widthFactor] ×
+/// [step] data units wide. It spans from [baseline] — or from the value in
 /// [baseColumn], for floating and stacked bars — to its y value.
 ///
 /// Several series side by side: give each the same [step] and a different
@@ -29,15 +29,19 @@ class BarSeries extends StatelessWidget {
     this.label,
     this.color,
     this.colorOf,
-    this.width = 0.7,
+    double? widthFactor,
     this.step,
     this.offset = 0,
-    this.radius = 0,
+    double? cornerRadius,
     this.visible = true,
     this.xScale = kChartX,
     this.yScale = kChartY,
+    this.clip = true,
     this.isolate = true,
-  });
+    @Deprecated('Use widthFactor. Removed in 0.3.0.') double? width,
+    @Deprecated('Use cornerRadius. Removed in 0.3.0.') double? radius,
+  }) : widthFactor = widthFactor ?? width ?? 0.7,
+       cornerRadius = cornerRadius ?? radius ?? 0;
 
   /// The data to plot.
   final ChartData data;
@@ -66,8 +70,12 @@ class BarSeries extends StatelessWidget {
   /// Per-bar colour; return null to use [color].
   final ChartBarColor? colorOf;
 
-  /// Bar width as a fraction of [step].
-  final double width;
+  /// Bar width as a fraction of [step]. Defaults to `0.7`.
+  final double widthFactor;
+
+  /// The old name of [widthFactor].
+  @Deprecated('Use widthFactor. Removed in 0.3.0.')
+  double get width => widthFactor;
 
   /// Distance between bars in data units. Defaults to the distance between
   /// the first two rows.
@@ -76,8 +84,13 @@ class BarSeries extends StatelessWidget {
   /// Shift of every bar in data units — use it to put series side by side.
   final double offset;
 
-  /// Corner radius in logical pixels.
-  final double radius;
+  /// Radius of the corners at the end of each bar that points away from its
+  /// base, in logical pixels. Defaults to `0`.
+  final double cornerRadius;
+
+  /// The old name of [cornerRadius].
+  @Deprecated('Use cornerRadius. Removed in 0.3.0.')
+  double get radius => cornerRadius;
 
   /// Whether the series is shown; a hidden series stays listed for legends.
   final bool visible;
@@ -87,6 +100,9 @@ class BarSeries extends StatelessWidget {
 
   /// Id of the vertical scale.
   final Object yScale;
+
+  /// Whether the bars are clipped to the plot area.
+  final bool clip;
 
   /// Whether the series paints into its own compositing layer.
   final bool isolate;
@@ -99,6 +115,7 @@ class BarSeries extends StatelessWidget {
       label: label,
       color: effectiveColor,
       visible: visible,
+      clip: clip,
       isolate: isolate,
       painter: BarSeriesPainter(
         data: data,
@@ -107,10 +124,10 @@ class BarSeries extends StatelessWidget {
         baseline: baseline,
         color: effectiveColor,
         colorOf: colorOf,
-        width: width,
+        widthFactor: widthFactor,
         step: step,
         offset: offset,
-        radius: radius,
+        cornerRadius: cornerRadius,
         xScale: xScale,
         yScale: yScale,
       ),
@@ -129,13 +146,17 @@ class BarSeriesPainter extends ChartSeriesPainter {
     this.baseline = 0,
     required this.color,
     this.colorOf,
-    this.width = 0.7,
+    double? widthFactor,
     this.step,
     this.offset = 0,
-    this.radius = 0,
+    double? cornerRadius,
     super.xScale,
     super.yScale,
-  }) : super(data: data);
+    @Deprecated('Use widthFactor. Removed in 0.3.0.') double? width,
+    @Deprecated('Use cornerRadius. Removed in 0.3.0.') double? radius,
+  }) : widthFactor = widthFactor ?? width ?? 0.7,
+       cornerRadius = cornerRadius ?? radius ?? 0,
+       super(data: data);
 
   /// The data to plot.
   final ChartData data;
@@ -156,7 +177,11 @@ class BarSeriesPainter extends ChartSeriesPainter {
   final ChartBarColor? colorOf;
 
   /// Bar width as a fraction of the step.
-  final double width;
+  final double widthFactor;
+
+  /// The old name of [widthFactor].
+  @Deprecated('Use widthFactor. Removed in 0.3.0.')
+  double get width => widthFactor;
 
   /// Distance between bars in data units.
   final double? step;
@@ -164,8 +189,12 @@ class BarSeriesPainter extends ChartSeriesPainter {
   /// Shift of every bar in data units.
   final double offset;
 
-  /// Corner radius.
-  final double radius;
+  /// Corner radius in logical pixels.
+  final double cornerRadius;
+
+  /// The old name of [cornerRadius].
+  @Deprecated('Use cornerRadius. Removed in 0.3.0.')
+  double get radius => cornerRadius;
 
   double get _step {
     final double? s = step;
@@ -177,7 +206,7 @@ class BarSeriesPainter extends ChartSeriesPainter {
     return 1;
   }
 
-  double get _half => _step * width / 2;
+  double get _half => _step * widthFactor / 2;
 
   double _base(int i) {
     final int? c = baseColumn;
@@ -192,10 +221,10 @@ class BarSeriesPainter extends ChartSeriesPainter {
       oldDelegate.baseline != baseline ||
       oldDelegate.color != color ||
       oldDelegate.colorOf != colorOf ||
-      oldDelegate.width != width ||
+      oldDelegate.widthFactor != widthFactor ||
       oldDelegate.step != step ||
       oldDelegate.offset != offset ||
-      oldDelegate.radius != radius;
+      oldDelegate.cornerRadius != cornerRadius;
 
   @override
   bool shouldRescale(BarSeriesPainter oldDelegate) =>
@@ -203,7 +232,7 @@ class BarSeriesPainter extends ChartSeriesPainter {
       oldDelegate.column != column ||
       oldDelegate.baseColumn != baseColumn ||
       oldDelegate.baseline != baseline ||
-      oldDelegate.width != width ||
+      oldDelegate.widthFactor != widthFactor ||
       oldDelegate.step != step ||
       oldDelegate.offset != offset;
 
@@ -336,7 +365,7 @@ class BarSeriesPainter extends ChartSeriesPainter {
         row = rowEnd;
       }
     } else {
-      final double r = math.min(radius, barPixels / 2);
+      final double r = math.min(cornerRadius, barPixels / 2);
       for (int i = start; i < end; i++) {
         final double y = data.value(i, column);
         final Rect? rect = _rectOf(i, y, xs, ys, half);

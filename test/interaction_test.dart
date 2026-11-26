@@ -287,7 +287,7 @@ void main() {
           controller: c,
           x: const BandScale(labels: <String>['Mon', 'Tue', 'Wed', 'Thu', 'Fri']),
           y: const LinearScale(range: FitDataRange(padding: 0.1)),
-          scales: const <Object, ChartScale>{
+          yScales: const <Object, ChartScale>{
             'mm': LinearScale(range: FitDataRange(includeZero: true)),
           },
           left: const <Widget>[ChartAxis()],

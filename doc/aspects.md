@@ -51,7 +51,7 @@ The 26 demos have 2,211 such lines in total, 85 on average.
 | A8 | Custom series | must | `a08_custom_series.dart` | 99 | `ChartSeriesPainter`, `ChartPaint` |
 | A9 | Custom interactions, coexisting gestures | must | `a09_coexistence.dart` | 113 | `ChartGestureDetector`, `ChartPanZoom` |
 | A10 | Large data | must | `a10_million_points.dart` | 66 | `ChartData`, `LineSeries` |
-| A11 | Mixed series, several Y axes | must | `a11_weather_combo.dart` | 77 | `Chart.scales`, `yScale:` |
+| A11 | Mixed series, several Y axes | must | `a11_weather_combo.dart` | 77 | `Chart.yScales`, `yScale:` |
 | A12 | Crosshair as shared state | must | `a12_crosshair.dart` | 94 | `ChartController.focus`, `ChartCrosshairBadge` |
 | A13 | Y auto-fit | must | `a13_auto_fit.dart` | 61 | `ChartRangePolicy.fitVisible` |
 | A14 | Pluggable scales | must | `a14_scales.dart` | 84 | `ChartScale`, `ChartTicks` |
@@ -360,7 +360,7 @@ scales.
   request. The cause is that line charts and bar charts are separate widgets.
 
 **In plot_twist.** There is one `Chart` widget and no chart types. A chart has
-named scales (`x`, `y`, and more in `scales:` and `xScales:`), and each series
+named scales (`x`, `y`, and more in `yScales:` and `xScales:`), and each series
 and axis names the scale it uses with `yScale:` or `scale:`.
 
 **Demo.** Rain as bars on a right-hand axis, mean temperature as a line on the
@@ -677,10 +677,10 @@ days need not take room, and a long history stays cheap to pan.
 - A hit has the close as its value and a `ChartCandle` with the four prices
   as its `datum`. Its `rect` is the candle, so the crosshair draws its rule
   and no dot, as it does for a bar.
-- A body is `width` × `step` wide. `step` defaults to the smallest distance
-  between the first rows, so a weekend without rows does not widen the
-  candles. The width is measured in pixels on both sides of a candle, so a
-  custom scale that gives closed days no room does not squeeze the candle
+- A body is `widthFactor` × `step` wide. `step` defaults to the smallest
+  distance between the first rows, so a weekend without rows does not widen
+  the candles. The width is measured in pixels on both sides of a candle, so
+  a custom scale that gives closed days no room does not squeeze the candle
   next to the gap.
 - `ChartData.setValue` changes the candle that is still trading and `addRow`
   opens the next one. The series repaints and the scales re-fit; no widget is

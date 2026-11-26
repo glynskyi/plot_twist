@@ -43,7 +43,7 @@ plot_twist examples compile against plot_twist 0.1.1.
 | lists of `FlSpot(x, y)` | `ChartData.fromXY(xs, ys)`, `ChartData.fromValues(ys)`, `ChartData.from<T>(items, x:, y:, more:)`, `ChartData.generate` | Change it in place with `add`, `addAll`, `addRow`, `prependAll`, `prependRows`, `removeFirst`, `setValue` or `replaceAll`. |
 | `FlSpot.nullSpot` | `double.nan` as a value | A NaN leaves a gap in a line. |
 | `CandlestickSpot(x:, open:, high:, low:, close:)` | a `ChartData` with four value columns, read by `CandlestickSeries` | Each hit carries a `ChartCandle` with the four prices. |
-| `ScatterSpot` | a row of the `ChartData` of a `ScatterSeries` | `radius` for all dots, or `sizeColumn` per dot. |
+| `ScatterSpot` | a row of the `ChartData` of a `ScatterSeries` | `pointRadius` for all dots, or `sizeColumn` per dot. |
 | implicit animation (`duration`, `curve` on the chart widget) | `AnimatedChartData` | Moves a series towards new data. |
 
 ### Scales and ranges
@@ -53,7 +53,7 @@ plot_twist examples compile against plot_twist 0.1.1.
 | `minX`, `maxX`, `minY`, `maxY` | the scale's `range`: `.fixed(min, max)`, `.fit()`, `.fitVisible()` or `.follow(span:)` | `.fitVisible()` fits Y to the data inside the visible X window. |
 | x values in `millisecondsSinceEpoch` | `ChartScale.time()` and `DateTime.chartValue` | Ticks follow the calendar and change unit with the zoom. |
 | `BarChartGroupData.x` and `BarChartAlignment` | `ChartScale.band(labels:)` | Band `i` is centred on `x = i`; every bar sits at its x value. |
-| a second Y range, rescaled by hand | `Chart.scales: {'name': ChartScale…}` and `yScale: 'name'` on the series | Any number of named scales; `xScales:` for horizontal ones. |
+| a second Y range, rescaled by hand | `Chart.yScales: {'name': ChartScale…}` and `yScale: 'name'` on the series | Any number of named scales; `xScales:` for horizontal ones. |
 | `SideTitles.interval`, `FlGridData.horizontalInterval`, `baselineX`, `baselineY` | the scale's `ticks:`: `LinearTicks(spacing:)`, `FixedTicks`, `TimeTicks`, `BandTicks`, `LogTicks` | `spacing` is in logical pixels, so tick density holds at every zoom level. |
 
 ### Series styling
@@ -69,7 +69,7 @@ plot_twist examples compile against plot_twist 0.1.1.
 | `dotData` (`FlDotData`) | `pointRadius`; widget markers with `ChartPositioned` |
 | `BarChartRodData.toY` | the value column of a `BarSeries` (`column`) |
 | `BarChartRodData.fromY` | `baseline`, or `baseColumn` for floating bars |
-| `BarChartRodData.width`, `borderRadius` | `width` (a fraction of `step`), `radius` |
+| `BarChartRodData.width`, `borderRadius` | `widthFactor` (a fraction of `step`), `cornerRadius` |
 | `rodStackItems` (`BarChartRodStackItem`) | `ChartData.stacked(layers)` and `BarSeries(baseColumn: 1)` |
 | several rods per `BarChartGroupData`, `barsSpace` | one `BarSeries` per series, with the same `step` and a different `offset` |
 | a colour per rod | `BarSeries.colorOf: (index, x, y) => …` |
@@ -266,7 +266,7 @@ Widget rainAndTemperature(ChartData rain, ChartData temperature) {
   return Chart(
     x: const .band(),
     y: const .linear(range: .fit(padding: 0.1)), // temperature
-    scales: const <Object, ChartScale>{
+    yScales: const <Object, ChartScale>{
       'rain': LinearScale(range: FitDataRange(includeZero: true)),
     },
     left: const <Widget>[ChartAxis()],
@@ -284,7 +284,7 @@ Widget rainAndTemperature(ChartData rain, ChartData temperature) {
 ```
 
 - The second Y scale has a name, and the bar series and the right axis refer
-  to it. More scales are more entries in `scales:`.
+  to it. More scales are more entries in `yScales:`.
 - The crosshair and the tooltip see both series, because they are in one
   chart.
 - [A11](https://glynskyi.github.io/plot_twist/#/a11)

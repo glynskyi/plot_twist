@@ -79,7 +79,7 @@ class _CandlesticksDemoState extends State<CandlesticksDemo> {
       ),
       y: const .linear(range: .fitVisible(padding: 0.12)),
       // Volume keeps to the bottom quarter of the plot.
-      scales: const <Object, ChartScale>{
+      yScales: const <Object, ChartScale>{
         'volume': LinearScale(range: FitVisibleRange(includeZero: true, padding: 3)),
       },
       right: <Widget>[

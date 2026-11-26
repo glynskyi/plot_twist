@@ -52,8 +52,8 @@ class ChartCandle {
 /// Candlesticks, one per row of a [ChartData] that has a value column each for
 /// the open, high, low and close.
 ///
-/// Each candle is centred on its x value. Its body is [width] × [step] data
-/// units wide and spans from the open to the close; its wick spans from the
+/// Each candle is centred on its x value. Its body is [widthFactor] × [step]
+/// data units wide and spans from the open to the close; its wick spans from the
 /// low to the high. A candle that closes at or above its open is drawn in
 /// [upColor], any other in [downColor].
 ///
@@ -77,14 +77,16 @@ class CandlestickSeries extends StatelessWidget {
     this.label,
     this.upColor = const Color(0xFF59A14F),
     this.downColor = const Color(0xFFE15759),
-    this.width = 0.7,
+    double? widthFactor,
     this.step,
     this.wickWidth = 1,
     this.visible = true,
     this.xScale = kChartX,
     this.yScale = kChartY,
+    this.clip = true,
     this.isolate = true,
-  });
+    @Deprecated('Use widthFactor. Removed in 0.3.0.') double? width,
+  }) : widthFactor = widthFactor ?? width ?? 0.7;
 
   /// The data to plot.
   final ChartData data;
@@ -114,8 +116,12 @@ class CandlestickSeries extends StatelessWidget {
   /// Colour of a candle that closes below its open.
   final Color downColor;
 
-  /// Body width as a fraction of [step].
-  final double width;
+  /// Body width as a fraction of [step]. Defaults to `0.7`.
+  final double widthFactor;
+
+  /// The old name of [widthFactor].
+  @Deprecated('Use widthFactor. Removed in 0.3.0.')
+  double get width => widthFactor;
 
   /// Distance between candles in data units. Defaults to the smallest
   /// distance between the first rows, so a weekend or a night without rows
@@ -134,6 +140,9 @@ class CandlestickSeries extends StatelessWidget {
   /// Id of the vertical scale.
   final Object yScale;
 
+  /// Whether the candles are clipped to the plot area.
+  final bool clip;
+
   /// Whether the series paints into its own compositing layer.
   final bool isolate;
 
@@ -144,6 +153,7 @@ class CandlestickSeries extends StatelessWidget {
       label: label,
       color: upColor,
       visible: visible,
+      clip: clip,
       isolate: isolate,
       painter: CandlestickSeriesPainter(
         data: data,
@@ -153,7 +163,7 @@ class CandlestickSeries extends StatelessWidget {
         closeColumn: closeColumn,
         upColor: upColor,
         downColor: downColor,
-        width: width,
+        widthFactor: widthFactor,
         step: step,
         wickWidth: wickWidth,
         xScale: xScale,
@@ -179,12 +189,14 @@ class CandlestickSeriesPainter extends ChartSeriesPainter {
     this.closeColumn = 3,
     required this.upColor,
     required this.downColor,
-    this.width = 0.7,
+    double? widthFactor,
     this.step,
     this.wickWidth = 1,
     super.xScale,
     super.yScale,
-  }) : assert(
+    @Deprecated('Use widthFactor. Removed in 0.3.0.') double? width,
+  }) : widthFactor = widthFactor ?? width ?? 0.7,
+       assert(
          data.valueColumns >
              math.max(math.max(openColumn, highColumn), math.max(lowColumn, closeColumn)),
          'A candlestick series needs a ChartData with a value column each for '
@@ -214,7 +226,11 @@ class CandlestickSeriesPainter extends ChartSeriesPainter {
   final Color downColor;
 
   /// Body width as a fraction of the step.
-  final double width;
+  final double widthFactor;
+
+  /// The old name of [widthFactor].
+  @Deprecated('Use widthFactor. Removed in 0.3.0.')
+  double get width => widthFactor;
 
   /// Distance between candles in data units.
   final double? step;
@@ -241,7 +257,7 @@ class CandlestickSeriesPainter extends ChartSeriesPainter {
     return smallest.isFinite ? smallest : 1;
   }
 
-  double get _half => _step * width / 2;
+  double get _half => _step * widthFactor / 2;
 
   // The pixel width of one step around the candle at [x], drawn at [centre].
   // Both sides are measured: a scale that gives closed hours no room squeezes
@@ -274,7 +290,7 @@ class CandlestickSeriesPainter extends ChartSeriesPainter {
       oldDelegate.highColumn != highColumn ||
       oldDelegate.lowColumn != lowColumn ||
       oldDelegate.closeColumn != closeColumn ||
-      oldDelegate.width != width ||
+      oldDelegate.widthFactor != widthFactor ||
       oldDelegate.step != step;
 
   @override
@@ -318,7 +334,7 @@ class CandlestickSeriesPainter extends ChartSeriesPainter {
     if (candle == null) return;
     final double x = data.x(i);
     final double centre = xs.toPixel(x);
-    final double half = _stepPixels(xs, x, centre, _step) * width / 2;
+    final double half = _stepPixels(xs, x, centre, _step) * widthFactor / 2;
     final Rect rect = Rect.fromPoints(
       Offset(centre - half, ys.toPixel(candle.low)),
       Offset(centre + half, ys.toPixel(candle.high)),
@@ -357,7 +373,7 @@ class CandlestickSeriesPainter extends ChartSeriesPainter {
     final ChartScaleView ys = view.scale(yScale);
     if (xs.extent <= 0 || ys.extent <= 0) return;
     final double step = _step;
-    final double half = step * width / 2;
+    final double half = step * widthFactor / 2;
     final (int start, int end) = data.isSorted
         ? data.indexRange(xs.min - half, xs.max + half, overscan: 0)
         : (0, data.length);
@@ -426,7 +442,7 @@ class CandlestickSeriesPainter extends ChartSeriesPainter {
             ys.toPixel(high),
           );
         }
-        final double body = _stepPixels(xs, x, centre, step) * width;
+        final double body = _stepPixels(xs, x, centre, step) * widthFactor;
         // A body no wider than its wick adds nothing to it.
         if (body > wickWidth) {
           box(path, centre - body / 2, centre + body / 2, ys.toPixel(open), ys.toPixel(close));

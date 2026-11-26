@@ -273,12 +273,12 @@ candles.addRow(time, <double>[open, high, low, close]); // the next candle opens
 
 - A candle that closes at or above its open is drawn in `upColor`, any other
   in `downColor`.
-- A body is `width` × `step` wide. `step` defaults to the smallest distance
-  between the first rows, so a night or a weekend without rows does not widen
-  the candles. On a time scale that gap stays empty. To close it, plot the
-  candles against their row number and label the axis with dates, as the
-  gallery's A26 demo does, or use a custom scale such as the one in A14 that
-  skips weekends.
+- A body is `widthFactor` × `step` wide. `step` defaults to the smallest
+  distance between the first rows, so a night or a weekend without rows does
+  not widen the candles. On a time scale that gap stays empty. To close it,
+  plot the candles against their row number and label the axis with dates, as
+  the gallery's A26 demo does, or use a custom scale such as the one in A14
+  that skips weekends.
 - When there are more candles than pixels, each pixel column is drawn as one
   candle made of its rows: lowest low to highest high, coloured by the first
   open and the last close. A test checks this with 100,000 candles, and

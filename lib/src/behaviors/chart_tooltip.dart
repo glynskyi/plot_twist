@@ -133,7 +133,7 @@ class ChartTooltip extends StatelessWidget {
                         ),
                       ),
                     if (hit.series?.label != null) Text('${hit.series!.label}: '),
-                    Text(formatNumber(hit.y)),
+                    Text(ChartTicks.formatNumber(hit.y)),
                   ],
                 ),
             ],

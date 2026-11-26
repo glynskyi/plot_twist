@@ -100,47 +100,55 @@ abstract class ChartTicks {
 
   /// Returns the ticks to show for [context], in ascending order.
   List<ChartTick> generate(ChartTickContext context);
+
+  /// Returns a "nice" step (1, 2, 2.5 or 5 times a power of ten) close to [raw].
+  static double niceStep(double raw) {
+    if (!(raw > 0) || !raw.isFinite) return 1;
+    final double exponent = math.pow(10, (math.log(raw) / math.ln10).floor()).toDouble();
+    final double fraction = raw / exponent;
+    final double nice;
+    if (fraction <= 1.0) {
+      nice = 1;
+    } else if (fraction <= 2.0) {
+      nice = 2;
+    } else if (fraction <= 2.5) {
+      nice = 2.5;
+    } else if (fraction <= 5.0) {
+      nice = 5;
+    } else {
+      nice = 10;
+    }
+    return nice * exponent;
+  }
+
+  /// Formats [value] with just enough decimals to distinguish steps of [step].
+  static String formatNumber(double value, {double? step}) {
+    if (!value.isFinite) return '';
+    int decimals = 0;
+    if (step != null && step > 0) {
+      // The fewest decimals that write the step exactly: 2.5 needs one, 0.25 two.
+      double scaled = step;
+      while (decimals < 10 && (scaled - scaled.roundToDouble()).abs() > 1e-9 * scaled.abs()) {
+        scaled *= 10;
+        decimals++;
+      }
+    } else {
+      final double abs = value.abs();
+      if (abs != abs.roundToDouble()) decimals = abs < 1 ? 3 : (abs < 100 ? 2 : 1);
+    }
+    String text = value.toStringAsFixed(decimals);
+    if (double.parse(text) == 0) text = 0.0.toStringAsFixed(decimals);
+    return text;
+  }
 }
 
-/// Returns a "nice" step (1, 2, 2.5 or 5 times a power of ten) close to [raw].
-double niceStep(double raw) {
-  if (!(raw > 0) || !raw.isFinite) return 1;
-  final double exponent = math.pow(10, (math.log(raw) / math.ln10).floor()).toDouble();
-  final double fraction = raw / exponent;
-  final double nice;
-  if (fraction <= 1.0) {
-    nice = 1;
-  } else if (fraction <= 2.0) {
-    nice = 2;
-  } else if (fraction <= 2.5) {
-    nice = 2.5;
-  } else if (fraction <= 5.0) {
-    nice = 5;
-  } else {
-    nice = 10;
-  }
-  return nice * exponent;
-}
+/// Returns a "nice" step close to [raw].
+@Deprecated('Use ChartTicks.niceStep. Removed in 0.3.0.')
+double niceStep(double raw) => ChartTicks.niceStep(raw);
 
 /// Formats [value] with just enough decimals to distinguish steps of [step].
-String formatNumber(double value, {double? step}) {
-  if (!value.isFinite) return '';
-  int decimals = 0;
-  if (step != null && step > 0) {
-    // The fewest decimals that write the step exactly: 2.5 needs one, 0.25 two.
-    double scaled = step;
-    while (decimals < 10 && (scaled - scaled.roundToDouble()).abs() > 1e-9 * scaled.abs()) {
-      scaled *= 10;
-      decimals++;
-    }
-  } else {
-    final double abs = value.abs();
-    if (abs != abs.roundToDouble()) decimals = abs < 1 ? 3 : (abs < 100 ? 2 : 1);
-  }
-  String text = value.toStringAsFixed(decimals);
-  if (double.parse(text) == 0) text = 0.0.toStringAsFixed(decimals);
-  return text;
-}
+@Deprecated('Use ChartTicks.formatNumber. Removed in 0.3.0.')
+String formatNumber(double value, {double? step}) => ChartTicks.formatNumber(value, step: step);
 
 /// "Nice" ticks for a linear scale: multiples of 1, 2, 2.5 or 5 × 10ⁿ.
 class LinearTicks extends ChartTicks {
@@ -157,7 +165,7 @@ class LinearTicks extends ChartTicks {
   List<ChartTick> generate(ChartTickContext context) {
     final double span = context.max - context.min;
     if (!(span > 0) || !span.isFinite) return const <ChartTick>[];
-    final double step = niceStep(span / context.targetCount(spacing));
+    final double step = ChartTicks.niceStep(span / context.targetCount(spacing));
     final double first = (context.min / step).ceilToDouble() * step;
     final List<ChartTick> ticks = <ChartTick>[];
     // Index-based to avoid accumulating floating point error.
@@ -165,7 +173,9 @@ class LinearTicks extends ChartTicks {
       final double value = first + i * step;
       if (value > context.max + step * 1e-9) break;
       final double clean = (value / step).roundToDouble() * step;
-      ticks.add(ChartTick(clean, format?.call(clean) ?? formatNumber(clean, step: step)));
+      ticks.add(
+        ChartTick(clean, format?.call(clean) ?? ChartTicks.formatNumber(clean, step: step)),
+      );
     }
     return ticks;
   }
@@ -192,7 +202,8 @@ class FixedTicks extends ChartTicks {
   @override
   List<ChartTick> generate(ChartTickContext context) => <ChartTick>[
     for (final double v in values)
-      if (v >= context.min && v <= context.max) ChartTick(v, format?.call(v) ?? formatNumber(v)),
+      if (v >= context.min && v <= context.max)
+        ChartTick(v, format?.call(v) ?? ChartTicks.formatNumber(v)),
   ];
 
   @override
@@ -266,7 +277,7 @@ class LogTicks extends ChartTicks {
       v >= context.min * (1 - 1e-12) && v <= context.max * (1 + 1e-12);
 
   ChartTick _tick(double v, int level) =>
-      ChartTick(v, format?.call(v) ?? formatNumber(v, step: v), level: level);
+      ChartTick(v, format?.call(v) ?? ChartTicks.formatNumber(v, step: v), level: level);
 
   @override
   bool operator ==(Object other) =>

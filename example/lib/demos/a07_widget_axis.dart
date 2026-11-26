@@ -82,7 +82,7 @@ class _WidgetAxisDemoState extends State<WidgetAxisDemo> {
             ],
             children: <Widget>[
               const ChartGrid(vertical: false),
-              BarSeries(data: sales, radius: 3),
+              BarSeries(data: sales, cornerRadius: 3),
               const ChartPanZoom(),
             ],
           ),

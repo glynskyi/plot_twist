@@ -256,7 +256,7 @@ void main() {
             controller: c,
             x: _x,
             y: _y,
-            children: <Widget>[BarSeries(data: data, baseColumn: 1, step: 1, width: 0.5)],
+            children: <Widget>[BarSeries(data: data, baseColumn: 1, step: 1, widthFactor: 0.5)],
           ),
         ),
       );
@@ -297,8 +297,8 @@ void main() {
             controller: c,
             y: _y,
             children: <Widget>[
-              BarSeries(data: a, label: 'a', step: 1, width: 0.4, offset: -0.2),
-              BarSeries(data: b, label: 'b', step: 1, width: 0.4, offset: 0.2),
+              BarSeries(data: a, label: 'a', step: 1, widthFactor: 0.4, offset: -0.2),
+              BarSeries(data: b, label: 'b', step: 1, widthFactor: 0.4, offset: 0.2),
             ],
           ),
         ),
@@ -351,7 +351,7 @@ void main() {
             controller: c,
             x: const LinearScale(range: FixedRange(0, 3)),
             y: const LinearScale(range: FixedRange(-100, 100)),
-            children: <Widget>[BarSeries(data: data, step: 1, width: 0.5, radius: 8)],
+            children: <Widget>[BarSeries(data: data, step: 1, widthFactor: 0.5, cornerRadius: 8)],
           ),
         ),
       );
@@ -404,7 +404,7 @@ void main() {
             controller: c,
             x: _x,
             y: _y,
-            children: <Widget>[BarSeries(data: data, step: 1, width: 0.5)],
+            children: <Widget>[BarSeries(data: data, step: 1, widthFactor: 0.5)],
           ),
         ),
       );

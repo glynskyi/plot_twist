@@ -50,7 +50,7 @@ class _WeatherComboDemoState extends State<WeatherComboDemo> {
     return Chart(
       x: ChartScale.band(labels: <String>[for (int i = 0; i < 14; i++) weekdays[i % 7]]),
       y: const .linear(range: .fit(padding: 0.15)),
-      scales: const <Object, ChartScale>{
+      yScales: const <Object, ChartScale>{
         'rain': LinearScale(range: FitDataRange(includeZero: true, padding: 0.6)),
       },
       left: <Widget>[ChartAxis(format: (ChartTick tick) => '${tick.label}°')],
@@ -63,13 +63,13 @@ class _WeatherComboDemoState extends State<WeatherComboDemo> {
           yScale: 'rain',
           label: 'Rain',
           color: wet.withValues(alpha: 0.55),
-          radius: 3,
+          cornerRadius: 3,
         ),
         BarSeries(
           data: range,
           baseColumn: 1,
-          width: 0.18,
-          radius: 4,
+          widthFactor: 0.18,
+          cornerRadius: 4,
           label: 'Min–max',
           color: warm.withValues(alpha: 0.3),
         ),

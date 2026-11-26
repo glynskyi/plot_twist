@@ -19,12 +19,14 @@ class ScatterSeries extends StatelessWidget {
     this.id,
     this.label,
     this.color,
-    this.radius = 3,
+    double? pointRadius,
     this.visible = true,
     this.xScale = kChartX,
     this.yScale = kChartY,
+    this.clip = true,
     this.isolate = true,
-  });
+    @Deprecated('Use pointRadius. Removed in 0.3.0.') double? radius,
+  }) : pointRadius = pointRadius ?? radius ?? 3;
 
   /// The data to plot.
   final ChartData data;
@@ -33,7 +35,7 @@ class ScatterSeries extends StatelessWidget {
   final int column;
 
   /// A value column holding each dot's radius in logical pixels; null uses
-  /// [radius] for all.
+  /// [pointRadius] for all.
   final int? sizeColumn;
 
   /// Identifier of the series.
@@ -45,8 +47,12 @@ class ScatterSeries extends StatelessWidget {
   /// Dot colour. Defaults to the first palette colour of the chart theme.
   final Color? color;
 
-  /// Dot radius in logical pixels.
-  final double radius;
+  /// Dot radius in logical pixels. Defaults to `3`.
+  final double pointRadius;
+
+  /// The old name of [pointRadius].
+  @Deprecated('Use pointRadius. Removed in 0.3.0.')
+  double get radius => pointRadius;
 
   /// Whether the series is shown; a hidden series stays listed for legends.
   final bool visible;
@@ -56,6 +62,9 @@ class ScatterSeries extends StatelessWidget {
 
   /// Id of the vertical scale.
   final Object yScale;
+
+  /// Whether the dots are clipped to the plot area.
+  final bool clip;
 
   /// Whether the series paints into its own compositing layer.
   final bool isolate;
@@ -68,13 +77,14 @@ class ScatterSeries extends StatelessWidget {
       label: label,
       color: effectiveColor,
       visible: visible,
+      clip: clip,
       isolate: isolate,
       painter: ScatterSeriesPainter(
         data: data,
         column: column,
         sizeColumn: sizeColumn,
         color: effectiveColor,
-        radius: radius,
+        pointRadius: pointRadius,
         xScale: xScale,
         yScale: yScale,
       ),
@@ -91,10 +101,12 @@ class ScatterSeriesPainter extends ChartSeriesPainter {
     this.column = 0,
     this.sizeColumn,
     required this.color,
-    this.radius = 3,
+    double? pointRadius,
     super.xScale,
     super.yScale,
-  }) : super(data: data);
+    @Deprecated('Use pointRadius. Removed in 0.3.0.') double? radius,
+  }) : pointRadius = pointRadius ?? radius ?? 3,
+       super(data: data);
 
   /// The data to plot.
   final ChartData data;
@@ -108,8 +120,12 @@ class ScatterSeriesPainter extends ChartSeriesPainter {
   /// Dot colour.
   final Color color;
 
-  /// Dot radius.
-  final double radius;
+  /// Dot radius in logical pixels.
+  final double pointRadius;
+
+  /// The old name of [pointRadius].
+  @Deprecated('Use pointRadius. Removed in 0.3.0.')
+  double get radius => pointRadius;
 
   @override
   bool shouldRepaint(ScatterSeriesPainter oldDelegate) =>
@@ -117,7 +133,7 @@ class ScatterSeriesPainter extends ChartSeriesPainter {
       oldDelegate.column != column ||
       oldDelegate.sizeColumn != sizeColumn ||
       oldDelegate.color != color ||
-      oldDelegate.radius != radius;
+      oldDelegate.pointRadius != pointRadius;
 
   @override
   bool shouldRescale(ScatterSeriesPainter oldDelegate) =>
@@ -210,6 +226,7 @@ class ScatterSeriesPainter extends ChartSeriesPainter {
     final double width = view.size.width;
     final double height = view.size.height;
     final int? sizes = sizeColumn;
+    final double radius = pointRadius;
     if (sizes != null) {
       final Paint paint = Paint()..color = color;
       for (int i = start; i < end; i++) {

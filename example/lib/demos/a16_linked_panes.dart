@@ -79,7 +79,7 @@ class _LinkedPanesDemoState extends State<LinkedPanesDemo> {
         ]),
         const Divider(height: 8),
         _pane(1, 1, const .linear(range: FitVisibleRange(includeZero: true)), <Widget>[
-          BarSeries(data: volume, label: 'Volume', width: 0.8),
+          BarSeries(data: volume, label: 'Volume', widthFactor: 0.8),
         ]),
         const Divider(height: 8),
         _pane(2, 1, const .linear(range: .fixed(0, 100)), <Widget>[

@@ -71,7 +71,7 @@ class _AccessibilityDemoState extends State<AccessibilityDemo> {
                   builder: (BuildContext context, ChartFocus? focus, Widget? child) => BarSeries(
                     data: revenue,
                     label: 'Revenue',
-                    radius: 4,
+                    cornerRadius: 4,
                     colorOf: (int i, double x, double y) => focus?.x == x ? scheme.tertiary : null,
                   ),
                 ),

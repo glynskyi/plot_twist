@@ -19,7 +19,7 @@ import 'chart_stack.dart';
 ///    other widget is simply laid out over the plot, like in a `Stack`.
 ///  * [left], [top], [right] and [bottom] dock widgets beside the plot —
 ///    usually `ChartAxis`, but any widget works. Lists are in visual order.
-///  * [x], [y] and [scales] configure the dimensions. The live visible window
+///  * [x], [y], [yScales] and [xScales] configure the dimensions. The live visible window
 ///    belongs to the [controller]; passing an equal scale on rebuild never
 ///    resets it.
 ///
@@ -32,8 +32,9 @@ class Chart extends StatefulWidget {
     this.controller,
     this.x = const LinearScale(),
     this.y = const LinearScale(),
-    this.scales = const <Object, ChartScale>{},
+    this.yScales = const <Object, ChartScale>{},
     this.xScales = const <Object, ChartScale>{},
+    @Deprecated('Use yScales. Removed in 0.3.0.') this.scales = const <Object, ChartScale>{},
     this.left = const <Widget>[],
     this.top = const <Widget>[],
     this.right = const <Widget>[],
@@ -54,6 +55,10 @@ class Chart extends StatefulWidget {
   final ChartScale y;
 
   /// Additional vertical scales by id — for example a second Y axis.
+  final Map<Object, ChartScale> yScales;
+
+  /// The old name of [yScales]. Its entries are added to those of [yScales].
+  @Deprecated('Use yScales. Removed in 0.3.0.')
   final Map<Object, ChartScale> scales;
 
   /// Additional horizontal scales by id.
@@ -118,7 +123,9 @@ class _ChartState extends State<Chart> with TickerProviderStateMixin {
     _controller.configure(<Object, ChartScale>{
       kChartX: widget.x,
       kChartY: widget.y,
+      // ignore: deprecated_member_use_from_same_package
       ...widget.scales,
+      ...widget.yScales,
       ...widget.xScales,
     });
   }

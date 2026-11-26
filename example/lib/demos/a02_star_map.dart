@@ -46,7 +46,7 @@ class _StarMapDemoState extends State<StarMapDemo> {
       bottom: <Widget>[ChartAxis(format: (ChartTick tick) => '${tick.label}°')],
       children: <Widget>[
         const ChartGrid(),
-        ScatterSeries(data: stars, radius: 1.1),
+        ScatterSeries(data: stars, pointRadius: 1.1),
         // The whole feature: one behavior, configured for two dimensions.
         const ChartPanZoom(panY: true, zoomY: true),
       ],

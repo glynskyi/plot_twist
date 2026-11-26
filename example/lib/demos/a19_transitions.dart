@@ -59,7 +59,7 @@ class _TransitionsDemoState extends State<TransitionsDemo> {
               AnimatedChartData(
                 data: periods[period]!,
                 builder: (BuildContext context, ChartData animated) =>
-                    BarSeries(data: animated, radius: 3, step: 1),
+                    BarSeries(data: animated, cornerRadius: 3, step: 1),
               ),
             ],
           ),

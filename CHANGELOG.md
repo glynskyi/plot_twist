@@ -1,3 +1,25 @@
+## 0.2.0
+
+### Renamed
+
+The old names keep working and are marked as deprecated. They are removed in
+0.3.0. After this, `width` always means a stroke width in logical pixels.
+
+| Old | New |
+|---|---|
+| `BarSeries.width`, `CandlestickSeries.width` | `widthFactor` |
+| `BarSeries.radius` | `cornerRadius` |
+| `ScatterSeries.radius` | `pointRadius` |
+| `Chart.scales` | `Chart.yScales` |
+| `formatNumber`, `niceStep` | `ChartTicks.formatNumber`, `ChartTicks.niceStep` |
+
+The painters of the three series are renamed in the same way.
+
+### New
+
+- `clip` on `BarSeries`, `ScatterSeries` and `CandlestickSeries`, as on
+  `LineSeries`.
+
 ## 0.1.1
 
 Fixes. Nothing is removed or renamed.
