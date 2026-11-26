@@ -34,10 +34,17 @@ class ChartViewChannel {
   /// Publishes [view]. [inLayoutCallback] must run its argument inside
   /// `RenderObject.invokeLayoutCallback` of the chart. Returns whether the view
   /// changed.
+  ///
+  /// With [force], dependents are told even when the view is equal to the
+  /// last one, for a change they depend on that the view does not show.
   @internal
-  bool publish(ChartView view, void Function(VoidCallback callback) inLayoutCallback) {
+  bool publish(
+    ChartView view,
+    void Function(VoidCallback callback) inLayoutCallback, {
+    bool force = false,
+  }) {
     final ChartView? old = _view;
-    if (old == view) return false;
+    if (old == view && !force) return false;
     _view = view;
     if (_dependents.isNotEmpty) {
       inLayoutCallback(() {

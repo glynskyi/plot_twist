@@ -125,6 +125,11 @@ class RenderChartLayout extends RenderBox
   EdgeInsets _gutters = EdgeInsets.zero;
   Rect _plotRect = Rect.zero;
   bool _deferredDirtyScheduled = false;
+  // Whether a gesture or animation was moving a scale at the last layout, and
+  // whether the next publish must reach the dependents although the view is
+  // unchanged.
+  bool _wasInteracting = false;
+  bool _forcePublish = false;
 
   /// The plot area in this render object's coordinates.
   Rect get plotRect => _plotRect;
@@ -223,11 +228,19 @@ class RenderChartLayout extends RenderBox
     _channel.publish(
       _buildView(plotSize, gutters),
       (VoidCallback callback) => invokeLayoutCallback<BoxConstraints>((_) => callback()),
+      force: _forcePublish,
     );
+    _forcePublish = false;
   }
 
   @override
   void performLayout() {
+    // Axes keep their gutter while a gesture or animation runs, so the plot
+    // does not twitch. When it ends the view may be just as it was; tell the
+    // axes anyway, so a gutter can shrink to its labels.
+    final bool interacting = _controller.isInteracting;
+    _forcePublish = _wasInteracting && !interacting;
+    _wasInteracting = interacting;
     _layoutDepth++;
     try {
       int revision = _controller.revision;

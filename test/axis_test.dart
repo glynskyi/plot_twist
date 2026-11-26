@@ -112,6 +112,43 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('the gutter waits for a gesture to end before it shrinks', (
+    WidgetTester tester,
+  ) async {
+    final ChartController controller = ChartController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      host(
+        Chart(
+          controller: controller,
+          x: const LinearScale(range: FixedRange(0, 10)),
+          y: const LinearScale(range: FixedRange(0, 50)),
+          left: const <Widget>[ChartAxis()],
+        ),
+      ),
+    );
+    double gutter() => tester.getSize(find.byType(ChartAxis)).width;
+    final double narrow = gutter();
+    controller.y.jumpTo(0, 5000000);
+    await tester.pump();
+    final double wide = gutter();
+    expect(wide, greaterThan(narrow), reason: 'growing is immediate');
+
+    // While the user drags, the gutter keeps its width.
+    controller.y.beginInteraction();
+    controller.y.jumpTo(0, 50);
+    await tester.pump();
+    expect(gutter(), wide);
+
+    // Once the gesture is over it fits the labels again, without any further
+    // change of the view.
+    controller.y.endInteraction();
+    await tester.pump();
+    expect(gutter(), narrow);
+    expect(controller.view!.size.width, 400 - narrow);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('an axis marker follows its value', (WidgetTester tester) async {
     final ChartController controller = ChartController();
     addTearDown(controller.dispose);
