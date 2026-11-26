@@ -263,6 +263,85 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('bars: lying, stacked, labelled, with a legend', (WidgetTester tester) async {
+    final ChartController chart = ChartController();
+    addTearDown(chart.dispose);
+    final ChartData online = ChartData.fromValues(<double>[30, 45, 40, 60]);
+    final ChartData retail = ChartData.fromValues(<double>[50, 40, 55, 45]);
+
+    final List<ChartData> layers = ChartData.stacked(<ChartData>[online, retail]);
+
+    await tester.pumpWidget(
+      host(
+        Chart(
+          controller: chart,
+          x: const LinearScale(range: FitDataRange(includeZero: true, padding: 0.1)),
+          y: const BandScale(labels: <String>['Q1', 'Q2', 'Q3', 'Q4'], reversed: true),
+          left: const <Widget>[ChartAxis()],
+          top: const <Widget>[ChartLegend()],
+          children: <Widget>[
+            for (final (int i, String name) in <String>['Online', 'Retail'].indexed)
+              BarSeries(
+                data: layers[i],
+                baseColumn: 1, // where the layer below ends
+                direction: Axis.horizontal,
+                label: name,
+              ),
+            // The size of every layer, written in its middle.
+            ChartDataLabels(
+              position: ChartDataLabelPosition.center,
+              format: (ChartHit mark) => '${(mark.value - mark.base!).round()}',
+            ),
+            const ChartCrosshair(mode: ChartHitMode.nearestY), // picks a row
+            const ChartTooltip(),
+          ],
+        ),
+      ),
+    );
+    // One frame: the legend is complete, in the colours of the palette.
+    expect(find.text('Online'), findsOneWidget);
+    expect(find.text('Retail'), findsOneWidget);
+    expect(find.text('Q1'), findsOneWidget);
+    expect(chart.series[1].color!.toARGB32(), ChartThemeData.defaultPalette[1].toARGB32());
+    // The values run along x, from zero to the longest stack with its padding.
+    expect(chart.x.range.min, 0);
+    expect(chart.x.range.max, closeTo(105 * 1.1, 1e-9));
+    expect(chart.y.range, const ChartRange(-0.5, 3.5));
+
+    // Q1 is the first row, at the top: 30 online, then 50 retail up to 80.
+    final ChartView view = chart.view!;
+    final List<ChartHit> row = chart.hitTest(
+      Offset(view.size.width - 5, view.y.toPixel(0)),
+      mode: ChartHitMode.nearestY,
+    );
+    expect(view.y.toPixel(0), lessThan(view.y.toPixel(3)));
+    expect(row.map((ChartHit hit) => (hit.series?.label, hit.value, hit.base)), <Object>{
+      ('Online', 30.0, 0.0),
+      ('Retail', 80.0, 30.0),
+    });
+
+    // Eight layers, eight labels.
+    final TestRecordingCanvas canvas = TestRecordingCanvas();
+    tester
+        .renderObject(
+          find.descendant(of: find.byType(ChartDataLabels), matching: find.byType(ChartPaint)),
+        )
+        .paint(TestRecordingPaintingContext(canvas), Offset.zero);
+    expect(
+      canvas.invocations.where((RecordedInvocation i) => i.invocation.memberName == #drawParagraph),
+      hasLength(8),
+    );
+
+    final TestPointer mouse = TestPointer(1, PointerDeviceKind.mouse);
+    final Offset plot = -view.chartRect.topLeft;
+    await tester.sendEventToBinding(mouse.hover(plot + Offset(40, view.y.toPixel(2) + 3)));
+    await tester.pump();
+    expect(chart.focus.value?.y, 2);
+    expect(find.text('Retail: '), findsOneWidget);
+    expect(find.text('95'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   test('data: rows can be added at both ends', () {
     final List<({DateTime time, double celsius})> readings = <({DateTime time, double celsius})>[
       for (int i = 0; i < 150; i++) (time: DateTime.utc(2026, 1, 1, i), celsius: 20 + i % 7),
@@ -296,7 +375,7 @@ void main() {
       r'```dart\n(.*?)```',
       dotAll: true,
     ).allMatches(File('README.md').readAsStringSync());
-    expect(samples.length, 6);
+    expect(samples.length, 7);
     final List<String> untested = <String>[
       for (final RegExpMatch sample in samples)
         for (final String line in sample[1]!.split('\n'))

@@ -5,6 +5,7 @@ import 'package:plot_twist/plot_twist.dart';
 
 /// A2 — Panning and zooming in both dimensions: drag diagonally, pinch or use
 /// the wheel, drag an axis to stretch just that scale, double-tap to reset.
+/// Hovering (or a long press) picks the star nearest to the pointer.
 class StarMapDemo extends StatefulWidget {
   const StarMapDemo({super.key});
 
@@ -49,6 +50,18 @@ class _StarMapDemoState extends State<StarMapDemo> {
         ScatterSeries(data: stars, pointRadius: 1.1),
         // The whole feature: one behavior, configured for two dimensions.
         const ChartPanZoom(panY: true, zoomY: true),
+        // The nearest point in both dimensions, not the nearest along x.
+        const ChartCrosshair(mode: .nearest, snapDistance: 24, horizontal: true),
+        ChartTooltip(
+          builder: (BuildContext context, List<ChartHit> hits) => Card(
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Text(
+                '${hits.first.x.toStringAsFixed(1)}°, ${hits.first.y.toStringAsFixed(1)}°',
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }

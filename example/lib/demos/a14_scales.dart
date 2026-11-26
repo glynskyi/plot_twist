@@ -33,7 +33,8 @@ class TradingDaysScale extends ChartScale {
 
 /// A14 — Scales are pluggable: time ticks change unit as you zoom, the Y scale
 /// switches between linear and logarithmic in place, and the X scale can be
-/// swapped for the custom one above.
+/// swapped for the custom one above. Both Y scales have minor ticks, which
+/// the axis marks and the grid draws fainter.
 class ScalesDemo extends StatefulWidget {
   const ScalesDemo({super.key});
 
@@ -89,11 +90,13 @@ class _ScalesDemoState extends State<ScalesDemo> {
           child: Chart(
             // Swapping a scale keeps the same data in view.
             x: tradingDays ? const TradingDaysScale() : const TimeScale(utc: true),
-            y: log ? const LogScale(range: .fitVisible()) : const LinearScale(range: .fitVisible()),
+            y: log
+                ? const LogScale(range: .fitVisible(), ticks: LogTicks(minor: true))
+                : const LinearScale(range: .fitVisible(), ticks: LinearTicks(minorCount: 4)),
             left: const <Widget>[ChartAxis(extent: .fixed(52))],
             bottom: const <Widget>[ChartAxis()],
             children: <Widget>[
-              const ChartGrid(),
+              const ChartGrid(minor: true),
               LineSeries(data: price, width: 1.5),
               const ChartPanZoom(),
             ],

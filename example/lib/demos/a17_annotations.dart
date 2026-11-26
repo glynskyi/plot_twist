@@ -8,8 +8,8 @@ typedef _Point = ({double x, double y});
 
 /// A17 — Annotations the user can edit: drag the threshold pill up and down,
 /// drag either end of the trend line. They are made of the same public pieces
-/// as everything else — a painter for the lines, positioned widgets for the
-/// handles — and the handles keep their drags to themselves.
+/// as everything else — a reference line, a painter, positioned widgets for
+/// the handles — and the handles keep their drags to themselves.
 class AnnotationsDemo extends StatefulWidget {
   const AnnotationsDemo({super.key});
 
@@ -49,6 +49,12 @@ class _AnnotationsDemoState extends State<AnnotationsDemo> {
         LineSeries(data: data),
         const ChartPanZoom(),
         ChartPaint(painter: _AnnotationPainter(threshold, trend, scheme.error, scheme.tertiary)),
+        ChartReferenceLine.y(
+          threshold,
+          color: scheme.error,
+          width: 1.5,
+          dash: const <double>[6, 4],
+        ),
         ChartPositioned(
           x: .end,
           y: .value(threshold),
@@ -102,13 +108,6 @@ class _AnnotationPainter extends ChartPainter {
       ..drawRect(
         Rect.fromLTRB(0, 0, view.size.width, y),
         Paint()..color = alert.withValues(alpha: 0.08),
-      )
-      ..drawLine(
-        Offset(0, y),
-        Offset(view.size.width, y),
-        Paint()
-          ..color = alert
-          ..strokeWidth = 1.5,
       )
       ..drawLine(
         view.toPixel(trend[0].x, trend[0].y),

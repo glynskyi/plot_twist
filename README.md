@@ -24,6 +24,9 @@ instead of forking the library.
 - One small painter contract covers custom series. A custom series gets
   automatic ranges, tooltips and crosshairs for free, the same way the
   built-in line, bar, scatter and candlestick series do.
+- Bars stand or lie, bars and areas stack, and candles are filled, hollow or
+  OHLC bars. Data labels, a legend, reference lines and an appear animation
+  are layers you add.
 - Linear, log, time and band scales, or your own transform.
 - A million-point line pans and zooms without a missed frame on a Mac (see
   [Performance](#performance)).
@@ -31,15 +34,17 @@ instead of forking the library.
 - No dependencies beyond Flutter's widgets layer. The package does not
   import Material or Cupertino.
 
-Version 0.1.0 is the first public cut. The API can still change. To hear about
-new versions, watch the repository's releases on GitHub (Watch → Custom →
-Releases).
+The API is 0.x and can still change. 0.2.0 renamed a few parameters; the old
+names keep working until 0.3.0 (see the
+[changelog](https://github.com/glynskyi/plot_twist/blob/main/CHANGELOG.md)).
+To hear about new versions, watch the repository's releases on GitHub
+(Watch → Custom → Releases).
 
 ## Quick start
 
 ```yaml
 dependencies:
-  plot_twist: ^0.1.0
+  plot_twist: ^0.2.0
 ```
 
 ```dart
@@ -220,6 +225,51 @@ data.prependAll(xs, ys); // older history
 data.removeFirst(100); // keep a window
 ```
 
+## Bars, stacks and labels
+
+Bars stand by default and lie with `direction: Axis.horizontal`. The data is
+the same either way: the rows then run along the vertical scale and the
+values along the horizontal one.
+
+```dart
+final List<ChartData> layers = ChartData.stacked(<ChartData>[online, retail]);
+
+Chart(
+  x: const LinearScale(range: FitDataRange(includeZero: true, padding: 0.1)),
+  y: const BandScale(labels: <String>['Q1', 'Q2', 'Q3', 'Q4'], reversed: true),
+  left: const <Widget>[ChartAxis()],
+  top: const <Widget>[ChartLegend()],
+  children: <Widget>[
+    for (final (int i, String name) in <String>['Online', 'Retail'].indexed)
+      BarSeries(
+        data: layers[i],
+        baseColumn: 1, // where the layer below ends
+        direction: Axis.horizontal,
+        label: name,
+      ),
+    // The size of every layer, written in its middle.
+    ChartDataLabels(
+      position: ChartDataLabelPosition.center,
+      format: (ChartHit mark) => '${(mark.value - mark.base!).round()}',
+    ),
+    const ChartCrosshair(mode: ChartHitMode.nearestY), // picks a row
+    const ChartTooltip(),
+  ],
+)
+```
+
+- A series without a `color` takes the next colour of the theme's palette.
+- `ChartData.stacked` returns a store per layer with its top and its base.
+  A `LineSeries` takes the same `baseColumn`, which makes a stacked area.
+- `ChartLegend` lists the series that have a `label`. It reports taps and
+  leaves it to your state which series is `visible`.
+- `ChartDataLabels` labels every series, also one of your own. Above 250
+  visible points it draws none.
+- Around a series or a whole chart, `ChartAppear` grows the series in when
+  they are first shown, under axes that stand still.
+- `ChartReferenceLine.y(value)` draws a threshold or a target, with an
+  optional label.
+
 ## Candlesticks
 
 `CandlestickSeries` reads four value columns of a `ChartData`: the open, high,
@@ -272,7 +322,9 @@ candles.addRow(time, <double>[open, high, low, close]); // the next candle opens
 ```
 
 - A candle that closes at or above its open is drawn in `upColor`, any other
-  in `downColor`.
+  in `downColor`. `style: CandleStyle.hollow` outlines the candles that close
+  at or above their open, and `CandleStyle.ohlc` draws open-high-low-close
+  bars.
 - A body is `widthFactor` × `step` wide. `step` defaults to the smallest
   distance between the first rows, so a night or a weekend without rows does
   not widen the candles. On a time scale that gap stays empty. To close it,
@@ -322,17 +374,17 @@ and a test fails if any demo goes over 120 lines.
 
 | | Aspect | Lines | | Aspect | Lines |
 |---|---|---|---|---|---|
-| A1 | Viewport controller | 76 | A14 | Pluggable scales | 84 |
-| A2 | 2D pan and zoom | 43 | A15 | Live data | 85 |
+| A1 | Viewport controller | 76 | A14 | Pluggable scales | 86 |
+| A2 | 2D pan and zoom | 54 | A15 | Live data | 85 |
 | A3 | Edge-crossing marker | 90 | A16 | Linked charts | 82 |
-| A4 | Widgets as tooltips | 93 | A17 | Editable annotations | 107 |
+| A4 | Widgets as tooltips | 93 | A17 | Editable annotations | 106 |
 | A5 | Infinite history | 86 | A18 | Accessibility | 95 |
-| A6 | Lazy widget markers | 82 | A19 | Animated transitions | 59 |
-| A7 | Widgets as axis labels | 82 | A20 | Legend outside the chart | 83 |
+| A6 | Lazy widget markers | 82 | A19 | Animated transitions | 78 |
+| A7 | Widgets as axis labels | 82 | A20 | Legend outside the chart | 68 |
 | A8 | Custom series | 99 | A21 | Non-Cartesian content | 119 |
 | A9 | Gestures that coexist | 113 | A22 | Data-driven styling | 86 |
 | A10 | One million points | 66 | A23 | Navigator by composition | 90 |
-| A11 | Mixed series, two Y axes | 77 | A24 | Many small charts | 65 |
+| A11 | Mixed series, two Y axes | 87 | A24 | Many small charts | 65 |
 | A12 | Crosshair as shared state | 94 | A25 | Export to PNG | 85 |
 | A13 | Auto-fit Y | 61 | A26 | Candlesticks | 109 |
 
@@ -351,8 +403,7 @@ problems app developers report, and shows how each one is met.
 - A Material theme adapter and a `Scrollbar` adapter.
 - Financial indicators such as moving averages and bands. Compute them in the
   app and draw the result with the built-in series.
-- Hollow candles and open-high-low-close bars.
-- Horizontal bars.
+- Tick labels that follow a locale, and right-to-left layout.
 
 Nothing has been measured or tried on a phone yet.
 

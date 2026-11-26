@@ -5,7 +5,8 @@ import 'package:plot_twist/plot_twist.dart';
 
 /// A19 — Animated transitions. Switch the period and the bars morph: matching
 /// bars move, new ones grow in, extra ones shrink away, and the scales re-fit
-/// as they go. Each frame only repaints the series — nothing is rebuilt.
+/// as they go. Each frame only repaints the series — nothing is rebuilt. The
+/// button lays the bars down; the value labels follow either way.
 class TransitionsDemo extends StatefulWidget {
   const TransitionsDemo({super.key});
 
@@ -25,6 +26,7 @@ class _TransitionsDemoState extends State<TransitionsDemo> {
     'Year': _series(12, 900),
   };
   String period = 'Week';
+  bool horizontal = false;
 
   @override
   void dispose() {
@@ -36,31 +38,51 @@ class _TransitionsDemoState extends State<TransitionsDemo> {
 
   @override
   Widget build(BuildContext context) {
+    // The rows of the data are bands; which way they run is up to the series.
+    final ChartScale bands = ChartScale.band(reversed: horizontal);
+    const ChartScale values = LinearScale(range: FitDataRange(includeZero: true, padding: 0.1));
+    final Widget bandAxis = ChartAxis(format: (ChartTick tick) => '${tick.value.round() + 1}');
     return Column(
       children: <Widget>[
-        SegmentedButton<String>(
-          segments: <ButtonSegment<String>>[
-            for (final String name in periods.keys)
-              ButtonSegment<String>(value: name, label: Text(name)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            SegmentedButton<String>(
+              segments: <ButtonSegment<String>>[
+                for (final String name in periods.keys)
+                  ButtonSegment<String>(value: name, label: Text(name)),
+              ],
+              selected: <String>{period},
+              onSelectionChanged: (Set<String> s) => setState(() => period = s.first),
+            ),
+            IconButton(
+              tooltip: horizontal ? 'Columns' : 'Horizontal bars',
+              icon: const Icon(Icons.rotate_90_degrees_cw),
+              onPressed: () => setState(() => horizontal = !horizontal),
+            ),
           ],
-          selected: <String>{period},
-          onSelectionChanged: (Set<String> s) => setState(() => period = s.first),
         ),
         const SizedBox(height: 8),
         Expanded(
           child: Chart(
-            x: const .band(),
-            y: const .linear(range: FitDataRange(includeZero: true, padding: 0.1)),
-            left: const <Widget>[ChartAxis(extent: .fixed(48))],
-            bottom: <Widget>[ChartAxis(format: (ChartTick tick) => '${tick.value.round() + 1}')],
+            x: horizontal ? values : bands,
+            y: horizontal ? bands : values,
+            left: <Widget>[horizontal ? bandAxis : const ChartAxis(extent: .fixed(48))],
+            bottom: <Widget>[horizontal ? const ChartAxis() : bandAxis],
             children: <Widget>[
-              const ChartGrid(vertical: false),
+              ChartGrid(vertical: horizontal, horizontal: !horizontal),
               // Give it the data you want to show; it animates the difference.
               AnimatedChartData(
                 data: periods[period]!,
-                builder: (BuildContext context, ChartData animated) =>
-                    BarSeries(data: animated, cornerRadius: 3, step: 1),
+                builder: (BuildContext context, ChartData animated) => BarSeries(
+                  data: animated,
+                  direction: horizontal ? .horizontal : .vertical,
+                  cornerRadius: 3,
+                  step: 1,
+                ),
               ),
+              // One layer labels what the series show, whichever way they point.
+              ChartDataLabels(format: (ChartHit mark) => '${mark.value.round()}'),
             ],
           ),
         ),

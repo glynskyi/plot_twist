@@ -1,5 +1,9 @@
 ## 0.2.0
 
+Horizontal bars, stacked areas, data labels, a legend, an appear animation,
+reference lines, minor ticks and candle styles. A few parameters have new
+names; the old ones keep working until 0.3.0.
+
 ### Breaking
 
 - The library no longer exports its render objects and their parent data:
@@ -41,7 +45,6 @@ The painters of the three series are renamed in the same way.
   for a `ChartPaint` with a painter of your own, where it used to be null.
 - `color` of `LineSeriesPainter`, `BarSeriesPainter` and `ScatterSeriesPainter`
   is optional and nullable. Null paints with `ChartPaintContext.seriesColor`.
-
 - `ChartHitMode` has a third value, `nearestY`. A `switch` over the modes in a
   series of your own needs a case for it; a series whose rows run along x
   adds no hit there.
@@ -53,35 +56,14 @@ The painters of the three series are renamed in the same way.
 - A dashed `LineSeries` keeps its dashes in place while it is panned. They
   used to jump along the line whenever a row left the window.
 
+### Gallery
+
+- A2 picks the nearest star in both dimensions, A11 grows its series in, A14
+  has minor ticks, A17 draws its threshold with `ChartReferenceLine`, A19
+  lays its bars down and labels them, and A20 uses `ChartLegend`.
+
 ### New
 
-- `ChartCrosshair(mode:)`: `ChartHitMode.nearest` snaps to the closest point
-  in both dimensions, so a tooltip on a scatter plot shows the dot under the
-  pointer. `ChartHitMode.nearestY` snaps along y, for horizontal bars. The
-  mode is stored in `ChartFocus.mode`, and `ChartController.hitsFor(focus)`
-  returns the data points a focus stands for. `snapDistance` limits how far
-  the focus snaps.
-- `CandlestickSeries(style:)`: `CandleStyle.hollow` outlines the candles that
-  close at or above their open, `CandleStyle.ohlc` draws OHLC bars. Both are
-  still two draw calls per frame.
-- `ChartAppear`: wrap a series or a whole chart, and its series grow, are
-  uncovered or fade in when first shown (`ChartAppearEffect.growY`, `growX`,
-  `reveal`, `fade`). Only the painting is animated: ranges and hits are
-  final from the first frame, so the axes stand still, and a series of your
-  own gets it too. It is skipped under reduced motion.
-- `ChartLegend`: the colour and label of every series, for a side slot of
-  the chart or anywhere else with the chart's controller. It is complete on
-  the first frame, wraps, dims hidden series and reports taps
-  (`onSeriesTap`), so your state keeps deciding which series is visible.
-- `ChartDataLabels`: a layer that writes the value next to every visible
-  data point of bars in both directions, lines, scatter plots and
-  candlesticks, with `format`, `position` (outside, inside or centred),
-  overlap hiding and a limit (`maxLabels`, 250) above which it draws none.
-  A series of your own gets labels by overriding
-  `ChartSeriesPainter.visitMarks`.
-- `ChartController.seriesRepaint`: notifies at once when a series changes
-  what it shows, as the `repaint` of a painter that draws what the series
-  show.
 - Horizontal bars: `BarSeries(direction: Axis.horizontal)`. The rows run
   along the vertical scale and the values along the horizontal one; stacks,
   offsets, rounded ends and per-bar colours work as for columns. Use
@@ -93,28 +75,58 @@ The painters of the three series are renamed in the same way.
   to the extremes of each pixel column.
 - `ChartData.stacked(layers, diverging: true)` stacks negative values
   downwards from zero, for stacks with gains and losses.
+- `ChartDataLabels`: a layer that writes the value next to every visible
+  data point of bars in both directions, lines, scatter plots and
+  candlesticks, with `format`, `position` (outside, inside or centred),
+  overlap hiding and a limit (`maxLabels`, 250) above which it draws none.
+  A series of your own gets labels by overriding
+  `ChartSeriesPainter.visitMarks`.
+- `ChartLegend`: the colour and label of every series, for a side slot of
+  the chart or anywhere else with the chart's controller. It is complete on
+  the first frame, wraps, dims hidden series and reports taps
+  (`onSeriesTap`), so your state keeps deciding which series is visible.
+- `ChartAppear`: wrap a series or a whole chart, and its series grow, are
+  uncovered or fade in when first shown (`ChartAppearEffect.growY`, `growX`,
+  `reveal`, `fade`). Only the painting is animated: ranges and hits are
+  final from the first frame, so the axes stand still, and a series of your
+  own gets it too. It is skipped under reduced motion.
 - `ChartReferenceLine.y(value)` and `.x(value)`: a line across the plot at a
   threshold, a target or an average, with an optional dash pattern and a
   label widget that follows the line. `includeInRange` widens automatic
   ranges to show it.
-- `ChartPaint(listed: false)`, for a helper layer that counts for automatic
-  ranges but is no series to a legend. `ChartSeries.listed` reports it.
 - Minor ticks: `LinearTicks(minorCount:)`, `LogTicks(minor:)` and
   `BandTicks(minor:)`. An axis draws a short mark at each
   (`ChartAxis.minorTickLength`), and `ChartGrid(minor: true)` a fainter line.
   They are in `ChartScaleView.minorTicks`; ticks of your own provide them by
   overriding `ChartTicks.generateMinor`.
+- `CandlestickSeries(style:)`: `CandleStyle.hollow` outlines the candles that
+  close at or above their open, `CandleStyle.ohlc` draws OHLC bars. Both are
+  still two draw calls per frame.
+- `ChartCrosshair(mode:)`: `ChartHitMode.nearest` snaps to the closest point
+  in both dimensions, so a tooltip on a scatter plot shows the dot under the
+  pointer. `ChartHitMode.nearestY` snaps along y, for horizontal bars. The
+  mode is stored in `ChartFocus.mode`, and `ChartController.hitsFor(focus)`
+  returns the data points a focus stands for. `snapDistance` limits how far
+  the focus snaps.
+- `ChartTooltip(yScale:)`, for a focus measured on another vertical scale.
 - `dash` on `ChartGrid` and `ChartCrosshair`. For painters of your own,
   `ChartPainter.dashPath` cuts a path into dashes and
   `ChartPainter.drawDashedLine` draws a dashed straight line in one call.
-- `ChartTooltip(yScale:)`, for a focus measured on another vertical scale.
+- `clip` on `BarSeries`, `ScatterSeries` and `CandlestickSeries`, as on
+  `LineSeries`.
+
+For series and painters of your own:
+
+- `ChartPaintContext.seriesColor`: the colour of the layer being painted, for
+  painters of your own.
 - `ChartHit.base`, `ChartHit.valueAxis`, `ChartHit.value` and
   `ChartHit.argument`. A bar's hit carries the value it starts from, so a
   tooltip can show the size of one layer of a stack.
-- `ChartPaintContext.seriesColor`: the colour of the layer being painted, for
-  painters of your own.
-- `clip` on `BarSeries`, `ScatterSeries` and `CandlestickSeries`, as on
-  `LineSeries`.
+- `ChartPaint(listed: false)`, for a helper layer that counts for automatic
+  ranges but is no series to a legend. `ChartSeries.listed` reports it.
+- `ChartController.seriesRepaint`: notifies at once when a series changes
+  what it shows, as the `repaint` of a painter that draws what the series
+  show.
 
 ## 0.1.1
 

@@ -210,7 +210,7 @@ These are listed from the easiest to the most powerful.
 | `ChartPositioned` | a widget and an anchor per dimension, a resolver callback, or a span between values | markers, labels, placeholders, pinned overlays |
 | `ChartLayoutBuilder<T>` | a selector `(view) => T` and a builder | widgets built for what is visible |
 | `ChartPaint` and `ChartPainter` | `paint(context)` with a canvas and the view | bands, thresholds, any drawing |
-| `ChartSeriesPainter` | `paint`, `bounds`, `collectHits`, `valueAt` | a series with automatic ranges, tooltips and a legend entry |
+| `ChartSeriesPainter` | `paint`, `bounds`, `collectHits`, `valueAt`, `visitMarks` | a series with automatic ranges, tooltips, data labels, a palette colour and a legend entry |
 | `ChartScale` and `ChartTicks` | a transform and its inverse; a tick generator | log, time, category and custom scales |
 | `ChartGestureDetector` and the controller API | recognizers and callbacks | custom interactions |
 | `ChartAxis` and `ChartAxisMarker` | a label builder; widgets pinned to a value in the gutter | widget tick labels, value pills |
@@ -281,9 +281,9 @@ lib/src/rendering/       the chart, stack and axis render objects, the view chan
 lib/src/widgets/         Chart, ChartStack, ChartPositioned, ChartPaint, ChartAxis, themes
 lib/src/interaction/     the pointer hub and the pan and zoom recognizer
 lib/src/series/          line, bar, scatter, candlestick  (public API only)
-lib/src/layers/          the grid                 (public API only)
-lib/src/behaviors/       pan and zoom, crosshair, tooltip, loader, animated data  (public API only)
+lib/src/layers/          the grid, reference lines, data labels, the legend  (public API only)
+lib/src/behaviors/       pan and zoom, crosshair, tooltip, loader, animated data, appear  (public API only)
 ```
 
-The package is about 10,200 lines of Dart and has no dependencies besides
+The package is about 12,300 lines of Dart and has no dependencies besides
 Flutter.

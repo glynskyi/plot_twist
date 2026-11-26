@@ -3,9 +3,10 @@ import 'package:plot_twist/plot_twist.dart';
 
 import '../shared/fake.dart';
 
-/// A20 — The legend is an ordinary widget outside the chart, fed by the
-/// chart's public list of series. Tap a chip to hide a series, long-press to
-/// show only that one; the scales re-fit to what is left.
+/// A20 — A legend. `ChartLegend` lists the series of a chart; here it sits
+/// outside the chart, so it is given the controller. Tap an item to hide a
+/// series, long-press to show only that one; the scales re-fit to what is
+/// left. The series take their colours from the palette of the theme.
 class LegendDemo extends StatefulWidget {
   const LegendDemo({super.key});
 
@@ -36,34 +37,20 @@ class _LegendDemoState extends State<LegendDemo> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        // Rebuilt when series are added, removed or change.
-        ListenableBuilder(
-          listenable: chart.seriesListenable,
-          builder: (BuildContext context, Widget? child) => Wrap(
-            spacing: 8,
-            children: <Widget>[
-              for (final ChartSeries series in chart.series)
-                GestureDetector(
-                  onLongPress: () => setState(() {
-                    hidden
-                      ..clear()
-                      ..addAll(
-                        chart.series
-                            .map((ChartSeries s) => s.id!)
-                            .where((Object id) => id != series.id),
-                      );
-                  }),
-                  child: FilterChip(
-                    avatar: CircleAvatar(backgroundColor: series.color),
-                    showCheckmark: false,
-                    label: Text(series.label ?? ''),
-                    selected: !hidden.contains(series.id),
-                    onSelected: (bool show) =>
-                        setState(() => show ? hidden.remove(series.id) : hidden.add(series.id!)),
-                  ),
-                ),
-            ],
+        // It reports taps; which series is visible stays in this state.
+        ChartLegend(
+          controller: chart,
+          textStyle: Theme.of(context).textTheme.bodyMedium,
+          swatchSize: 12,
+          spacing: 20,
+          onSeriesTap: (ChartSeries series) => setState(
+            () => hidden.contains(series.id) ? hidden.remove(series.id) : hidden.add(series.id!),
           ),
+          onSeriesLongPress: (ChartSeries series) => setState(() {
+            hidden
+              ..clear()
+              ..addAll(regions.where((String region) => region != series.id));
+          }),
         ),
         const SizedBox(height: 8),
         Expanded(
@@ -79,7 +66,6 @@ class _LegendDemoState extends State<LegendDemo> {
                   id: regions[i],
                   label: regions[i],
                   data: lines[i],
-                  color: ChartThemeData.defaultPalette[i],
                   // Hidden series stay listed, but are not drawn or measured.
                   visible: !hidden.contains(regions[i]),
                 ),

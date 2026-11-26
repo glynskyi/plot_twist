@@ -8,7 +8,8 @@ import '../shared/fake.dart';
 /// A11 — Different series types in one plot, on two Y scales: rain as bars on
 /// the right axis, temperature as a line on the left, with a floating bar per
 /// day for its min–max range. There is no "combo chart" class — a chart is
-/// just a list of layers and named scales.
+/// just a list of layers and named scales. When the chart first shows, the
+/// bars grow and the line is drawn in, under axes that stand still.
 class WeatherComboDemo extends StatefulWidget {
   const WeatherComboDemo({super.key});
 
@@ -58,22 +59,33 @@ class _WeatherComboDemoState extends State<WeatherComboDemo> {
       bottom: const <Widget>[ChartAxis()],
       children: <Widget>[
         const ChartGrid(vertical: false),
-        BarSeries(
-          data: rain,
-          yScale: 'rain',
-          label: 'Rain',
-          color: wet.withValues(alpha: 0.55),
-          cornerRadius: 3,
+        // Only the painting is animated: ranges and tooltips are final at once.
+        ChartAppear(
+          child: BarSeries(
+            data: rain,
+            yScale: 'rain',
+            label: 'Rain',
+            color: wet.withValues(alpha: 0.55),
+            cornerRadius: 3,
+          ),
         ),
-        BarSeries(
-          data: range,
-          baseColumn: 1,
-          widthFactor: 0.18,
-          cornerRadius: 4,
-          label: 'Min–max',
-          color: warm.withValues(alpha: 0.3),
+        ChartAppear(
+          effect: .fade,
+          delay: const Duration(milliseconds: 300),
+          child: BarSeries(
+            data: range,
+            baseColumn: 1,
+            widthFactor: 0.18,
+            cornerRadius: 4,
+            label: 'Min–max',
+            color: warm.withValues(alpha: 0.3),
+          ),
         ),
-        LineSeries(data: mean, label: 'Mean', color: warm, curve: .smooth, pointRadius: 3),
+        ChartAppear(
+          effect: .reveal,
+          delay: const Duration(milliseconds: 300),
+          child: LineSeries(data: mean, label: 'Mean', color: warm, curve: .smooth, pointRadius: 3),
+        ),
         const ChartCrosshair(),
         const ChartTooltip(),
         Align(

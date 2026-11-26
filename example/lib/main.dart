@@ -41,7 +41,7 @@ final List<Demo> demos = <Demo>[
   Demo(
     'A2',
     '2D pan and zoom',
-    'Drag in any direction, pinch or scroll to zoom, drag an axis to stretch it, double-tap to reset.',
+    'Drag, pinch or scroll, drag an axis to stretch it, double-tap to reset. Hover picks the nearest star.',
     'a02_star_map.dart',
     (_) => const StarMapDemo(),
   ),
@@ -104,7 +104,7 @@ final List<Demo> demos = <Demo>[
   Demo(
     'A11',
     'Mixed series, two Y axes',
-    'Bars, a line and floating bars in one plot, on two scales.',
+    'Bars, a line and floating bars in one plot, on two scales. They grow in when first shown.',
     'a11_weather_combo.dart',
     (_) => const WeatherComboDemo(),
   ),
@@ -125,7 +125,7 @@ final List<Demo> demos = <Demo>[
   Demo(
     'A14',
     'Pluggable scales',
-    'Time ticks that change unit, a log toggle, and a custom scale that skips weekends.',
+    'Time ticks that change unit, a log toggle with minor ticks, and a custom scale that skips weekends.',
     'a14_scales.dart',
     (_) => const ScalesDemo(),
   ),
@@ -160,14 +160,14 @@ final List<Demo> demos = <Demo>[
   Demo(
     'A19',
     'Animated transitions',
-    'Switch the period and the bars morph into the new data.',
+    'Switch the period and the bars morph into the new data. Lay them down; their labels follow.',
     'a19_transitions.dart',
     (_) => const TransitionsDemo(),
   ),
   Demo(
     'A20',
     'Legend outside the chart',
-    'Tap a chip to hide a series, long-press to show only that one.',
+    'Tap a legend item to hide a series, long-press to show only that one.',
     'a20_legend.dart',
     (_) => const LegendDemo(),
   ),

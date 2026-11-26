@@ -42,7 +42,7 @@ The 26 demos have 2,211 such lines in total, 85 on average.
 | # | Aspect | Priority | Demo file | Lines | Main API used |
 |---|---|---|---|---|---|
 | A1 | Viewport controller | must | `a01_viewport_inspector.dart` | 76 | `ChartController`, `ChartScaleController` |
-| A2 | 2D pan and zoom | must | `a02_star_map.dart` | 43 | `ChartPanZoom` |
+| A2 | 2D pan and zoom | must | `a02_star_map.dart` | 54 | `ChartPanZoom`, `ChartCrosshair(mode:)` |
 | A3 | Mixed-anchor, derived overlays | must | `a03_edge_crossing.dart` | 90 | `ChartPositioned.resolve`, `ChartAxisMarker` |
 | A4 | Widgets as tooltips | must | `a04_rich_tooltip.dart` | 93 | `ChartTooltip`, `ChartCrosshair` |
 | A5 | Lazy history | must | `a05_infinite_history.dart` | 86 | `ChartLoader`, `ChartData.prependAll`, `ChartLimits` |
@@ -51,16 +51,16 @@ The 26 demos have 2,211 such lines in total, 85 on average.
 | A8 | Custom series | must | `a08_custom_series.dart` | 99 | `ChartSeriesPainter`, `ChartPaint` |
 | A9 | Custom interactions, coexisting gestures | must | `a09_coexistence.dart` | 113 | `ChartGestureDetector`, `ChartPanZoom` |
 | A10 | Large data | must | `a10_million_points.dart` | 66 | `ChartData`, `LineSeries` |
-| A11 | Mixed series, several Y axes | must | `a11_weather_combo.dart` | 77 | `Chart.yScales`, `yScale:` |
+| A11 | Mixed series, several Y axes | must | `a11_weather_combo.dart` | 87 | `Chart.yScales`, `yScale:`, `ChartAppear` |
 | A12 | Crosshair as shared state | must | `a12_crosshair.dart` | 94 | `ChartController.focus`, `ChartCrosshairBadge` |
 | A13 | Y auto-fit | must | `a13_auto_fit.dart` | 61 | `ChartRangePolicy.fitVisible` |
-| A14 | Pluggable scales | must | `a14_scales.dart` | 84 | `ChartScale`, `ChartTicks` |
+| A14 | Pluggable scales | must | `a14_scales.dart` | 86 | `ChartScale`, `ChartTicks` |
 | A15 | Live data | should | `a15_live.dart` | 85 | `ChartRangePolicy.follow`, `ChartData.addAll` |
 | A16 | Linked charts | should | `a16_linked_panes.dart` | 82 | shared `ChartScaleController`, `ChartGutterGroup` |
-| A17 | Editable annotations | should | `a17_annotations.dart` | 107 | `ChartPainter`, `ChartGestureShield` |
+| A17 | Editable annotations | should | `a17_annotations.dart` | 106 | `ChartReferenceLine`, `ChartPainter`, `ChartGestureShield` |
 | A18 | Accessibility | should | `a18_accessibility.dart` | 95 | `Chart.semanticLabel`, `ChartLayoutBuilder` |
-| A19 | Animated transitions | should | `a19_transitions.dart` | 59 | `AnimatedChartData` |
-| A20 | Legend outside the chart | should | `a20_legend.dart` | 83 | `ChartController.series` |
+| A19 | Animated transitions | should | `a19_transitions.dart` | 78 | `AnimatedChartData`, `BarSeries(direction:)`, `ChartDataLabels` |
+| A20 | Legend outside the chart | should | `a20_legend.dart` | 68 | `ChartLegend`, `ChartController.series` |
 | A21 | Non-Cartesian content | should | `a21_donut.dart` | 119 | `ChartPainter`, `ChartPositioned.resolve` |
 | A22 | Data-driven styling | nice | `a22_styling.dart` | 86 | `LineSeries.shader`, `ChartTheme` |
 | A23 | Navigator by composition | nice | `a23_navigator.dart` | 90 | `ChartPositioned.span`, `panBy` |
@@ -119,7 +119,9 @@ space, so they also work on log and time scales. Limits come from the scale's
 `ChartLimits`.
 
 **Demo.** A 50,000-point scatter. The whole feature is
-`const ChartPanZoom(panY: true, zoomY: true)`.
+`const ChartPanZoom(panY: true, zoomY: true)`. Hovering picks the star nearest
+to the pointer in both dimensions, with `ChartCrosshair(mode: .nearest)`; the
+tooltip then shows that one point.
 
 ## A3. Mixed-anchor, derived overlays
 
@@ -365,7 +367,9 @@ and axis names the scale it uses with `yScale:` or `scale:`.
 
 **Demo.** Rain as bars on a right-hand axis, mean temperature as a line on the
 left, and a floating bar per day for the minimum and maximum, read from a
-second value column. Horizontal (transposed) bars are not supported in 0.1.0.
+second value column. Each series is wrapped in a `ChartAppear`, so the bars
+grow and the line is drawn in when the chart first shows. Bars lie down with
+`BarSeries(direction: Axis.horizontal)`, which A19 shows.
 
 ## A12. Crosshair as shared state
 
@@ -432,11 +436,14 @@ custom ticks, and gaps in data.
 units, so panning and zooming work the same on every scale. `LinearScale`,
 `LogScale`, `TimeScale` and `BandScale` are built in, each can be `reversed`,
 and `ticks:` replaces the tick strategy. A NaN value is a gap in a line.
+Linear, logarithmic and band ticks can have minor ticks
+(`LinearTicks(minorCount: 4)`, `LogTicks(minor: true)`): the axis marks them
+and `ChartGrid(minor: true)` draws a fainter line at each.
 
 **Demo.** Two years of hourly weekday prices. Time ticks change unit while
-zooming, a chip switches Y between linear and logarithmic, and another swaps X
-for `TradingDaysScale`, an 18-line scale written in the demo that gives
-weekends no room.
+zooming, a chip switches Y between linear and logarithmic, both with minor
+ticks, and another swaps X for `TradingDaysScale`, an 18-line scale written in
+the demo that gives weekends no room.
 
 ## A15. Live data
 
@@ -491,15 +498,17 @@ can drag.
 - Reference lines and range bands that only paint cannot be dragged by the
   user, and they tend to be clipped wrongly at the edges of the plot.
 
-**In plot_twist.** The package has no annotation classes, because the public
-pieces are enough. A `ChartPainter` draws the lines and fills. The handles are
+**In plot_twist.** `ChartReferenceLine.y(value)` and `.x(value)` draw a line
+at a value, solid or dashed, with an optional label widget; `includeInRange`
+makes automatic ranges show it. Everything else is made of the public pieces.
+A `ChartPainter` draws other lines and fills. The handles are
 `ChartPositioned` widgets with their own `GestureDetector`, wrapped in
 `ChartGestureShield` so that dragging them does not pan the chart.
 `view.toValue(pixel)` turns a drag into data units.
 
-**Demo.** A threshold with a pill that shows its value and a tinted area above
-it, and a trend line with a handle at each end. Drawing new lines and saving
-annotations are left out.
+**Demo.** A dashed threshold line with a pill that shows its value and a
+tinted area above it, and a trend line with a handle at each end. Drawing new
+lines and saving annotations are left out.
 
 ## A18. Accessibility
 
@@ -522,8 +531,8 @@ the crosshair and tooltip already follow.
 **Demo.** A 12-bar chart with all three. A widget test checks that the nodes
 exist, sit on their bars and focus their bar when activated, and that the
 arrow keys move the focus. It was not tried with VoiceOver or TalkBack.
-`AnimatedChartData` skips its transitions when `MediaQuery.disableAnimations`
-is set; animated window changes (`animateTo`, `resetToAuto` with a duration)
+`AnimatedChartData` and `ChartAppear` skip their animations when
+`MediaQuery.disableAnimations` is set; animated window changes (`animateTo`, `resetToAuto` with a duration)
 and flings do not read it.
 
 ## A19. Animated transitions
@@ -536,14 +545,25 @@ grow in and old ones shrink away.
 - Users want bars to grow in when the chart first appears, and marks to move
   when the data changes instead of jumping.
 
-**In plot_twist.** `AnimatedChartData(data: target, builder: (context,
-animated) => …)` gives the series a `ChartData` that moves towards the target.
-Each frame repaints the series and re-fits the scales. Window moves animate
-with `animateTo` and `resetToAuto(duration: …)`.
+**In plot_twist.** There are two animations, for two cases.
 
-**Demo.** Week, month and year bars that morph into each other. Custom series
-get no animation automatically; they can read an animated `ChartData` in the
-same way.
+- From one data set to another: `AnimatedChartData(data: target, builder:
+  (context, animated) => …)` gives the series a `ChartData` that moves towards
+  the target. Each frame repaints the series and re-fits the scales. A custom
+  series reads the animated `ChartData` in the same way.
+- The first show: `ChartAppear(child: …)` around a series or a whole chart
+  grows the series in (`growY`, `growX`), uncovers them (`reveal`) or fades
+  them in. Only the painting is animated, so the axes stand still, and every
+  series gets it, also a custom one. A11 uses it.
+
+Window moves animate with `animateTo` and `resetToAuto(duration: …)`.
+`AnimatedChartData` and `ChartAppear` are skipped when the platform asks for
+reduced motion; window moves and flings are not.
+
+**Demo.** Week, month and year bars that morph into each other. A button lays
+the bars down (`BarSeries(direction: Axis.horizontal)`), and a
+`ChartDataLabels` layer writes each value at the end of its bar in both
+directions.
 
 ## A20. Legend outside the chart
 
@@ -556,13 +576,21 @@ public series metadata.
   series metadata, they keep their own copy of the series list and keep it in
   sync with the chart by hand.
 
-**In plot_twist.** `controller.series` lists every series with its `id`,
-`label`, `color` and `visible`, and `controller.seriesListenable` notifies
-when the list changes. Every series has a `visible` flag. A hidden series
-stays in the list but is not drawn or measured, so the scales re-fit.
+**In plot_twist.** `controller.series` lists every series in paint order with
+its `id`, `label`, `color` and `visible`, and `controller.seriesListenable`
+notifies when the list changes. Every series has a `visible` flag. A hidden
+series stays in the list but is not drawn or measured, so the scales re-fit.
 
-**Demo.** Chips above the chart. Tap hides a series and long-press shows only
-that one.
+`ChartLegend` is a legend built on that list: a dot and a label per series,
+complete on the first frame. It goes in a side slot of the chart, or anywhere
+else with the chart's controller. It reports taps and long presses and leaves
+the `visible` of each series to the app's state. `itemBuilder` replaces its
+items, and a legend of your own is still a `ListenableBuilder` over the same
+list.
+
+**Demo.** A `ChartLegend` above the chart. Tap hides a series and long-press
+shows only that one. The four series have no colour of their own: each takes
+the next colour of the theme's palette.
 
 ## A21. Non-Cartesian content
 
@@ -696,8 +724,9 @@ days need not take room, and a long history stays cheap to pan.
 last-price pill on the axis, and a tooltip with the four prices and the
 volume. A timer trades the last candle ten times a second, and the window
 follows it until the user pans away. X is the number of the trading day and
-the axis labels turn it into a date, so weekends take no room. Hollow candles,
-open-high-low-close bars and indicators are not built in.
+the axis labels turn it into a date, so weekends take no room.
+`style: CandleStyle.hollow` and `CandleStyle.ohlc` draw hollow candles and
+open-high-low-close bars. Indicators are not built in.
 
 **Measured.** On macOS in profile mode, wheel-zooming the demo out to all
 5,000 days and back in, 90% of frames built in 2.7 ms or less and rastered in
@@ -747,5 +776,5 @@ quoted under A10.
 4. Widgets should be real children of a custom multi-child render object:
    placed during layout from data coordinates, built lazily, and laid out
    again instead of rebuilt during a pan.
-5. The core should stay small. plot_twist has about 10,200 lines and depends on
+5. The core should stay small. plot_twist has about 12,300 lines and depends on
    nothing but Flutter.

@@ -6,7 +6,7 @@ time.
 
 The fl_chart names on this page were verified against fl_chart 1.3.1 on
 13 November 2026, and its three examples compile against that version. The
-plot_twist examples compile against plot_twist 0.1.1.
+plot_twist examples compile against plot_twist 0.2.0.
 
 ## The differences that matter most
 
@@ -34,21 +34,21 @@ plot_twist examples compile against plot_twist 0.1.1.
 
 ### Charts and data
 
-| fl_chart 1.3.1 | plot_twist 0.1 | Notes |
+| fl_chart 1.3.1 | plot_twist 0.2 | Notes |
 |---|---|---|
 | `LineChart`, `BarChart`, `ScatterChart`, `CandlestickChart` | `Chart` with `LineSeries`, `BarSeries`, `ScatterSeries` or `CandlestickSeries` children | Series of different kinds can share one chart. |
 | `LineChartData`, `BarChartData`, `ScatterChartData`, `CandlestickChartData` | the arguments of `Chart`: scales, side slots and children | |
 | `PieChart`, `RadarChart`, `GaugeChart` | not built in | A `ChartPainter` in `ChartPaint` can draw one. [A21](https://glynskyi.github.io/plot_twist/#/a21) draws a donut in its demo file. |
-| `rotationQuarterTurns` (horizontal bar charts) | not supported in 0.1 | |
+| `rotationQuarterTurns` (horizontal bar charts) | `BarSeries(direction: Axis.horizontal)` | The data stays as it is: the rows run along the vertical scale. Use `ChartCrosshair(mode: ChartHitMode.nearestY)` with it. |
 | lists of `FlSpot(x, y)` | `ChartData.fromXY(xs, ys)`, `ChartData.fromValues(ys)`, `ChartData.from<T>(items, x:, y:, more:)`, `ChartData.generate` | Change it in place with `add`, `addAll`, `addRow`, `prependAll`, `prependRows`, `removeFirst`, `setValue` or `replaceAll`. |
 | `FlSpot.nullSpot` | `double.nan` as a value | A NaN leaves a gap in a line. |
 | `CandlestickSpot(x:, open:, high:, low:, close:)` | a `ChartData` with four value columns, read by `CandlestickSeries` | Each hit carries a `ChartCandle` with the four prices. |
 | `ScatterSpot` | a row of the `ChartData` of a `ScatterSeries` | `pointRadius` for all dots, or `sizeColumn` per dot. |
-| implicit animation (`duration`, `curve` on the chart widget) | `AnimatedChartData` | Moves a series towards new data. |
+| implicit animation (`duration`, `curve` on the chart widget) | `AnimatedChartData`, and `ChartAppear` for the first show | `AnimatedChartData` moves a series towards new data. `ChartAppear` grows or uncovers the series under axes that stand still. |
 
 ### Scales and ranges
 
-| fl_chart 1.3.1 | plot_twist 0.1 | Notes |
+| fl_chart 1.3.1 | plot_twist 0.2 | Notes |
 |---|---|---|
 | `minX`, `maxX`, `minY`, `maxY` | the scale's `range`: `.fixed(min, max)`, `.fit()`, `.fitVisible()` or `.follow(span:)` | `.fitVisible()` fits Y to the data inside the visible X window. |
 | x values in `millisecondsSinceEpoch` | `ChartScale.time()` and `DateTime.chartValue` | Ticks follow the calendar and change unit with the zoom. |
@@ -58,7 +58,7 @@ plot_twist examples compile against plot_twist 0.1.1.
 
 ### Series styling
 
-| fl_chart 1.3.1 | plot_twist 0.1 |
+| fl_chart 1.3.1 | plot_twist 0.2 |
 |---|---|
 | `LineChartBarData.color`, `barWidth` | `LineSeries.color`, `width` |
 | `isCurved` | `curve: LineCurve.smooth` (monotone: it never overshoots the data) |
@@ -66,44 +66,47 @@ plot_twist examples compile against plot_twist 0.1.1.
 | `dashArray` | `dash` |
 | `gradient` | `shader: (view) => …`, built from the current view, so stops can be data values |
 | `belowBarData` (`BarAreaData`) | `fillColor`, `fillGradient` and `baseline` |
+| `betweenBarsData` (`BetweenBarsData`) | `LineSeries(baseColumn:)`: the area between the line and another value column; with `ChartData.stacked`, a stacked area |
 | `dotData` (`FlDotData`) | `pointRadius`; widget markers with `ChartPositioned` |
 | `BarChartRodData.toY` | the value column of a `BarSeries` (`column`) |
 | `BarChartRodData.fromY` | `baseline`, or `baseColumn` for floating bars |
 | `BarChartRodData.width`, `borderRadius` | `widthFactor` (a fraction of `step`), `cornerRadius` |
 | `rodStackItems` (`BarChartRodStackItem`) | `ChartData.stacked(layers)` and `BarSeries(baseColumn: 1)` |
+| `BarChartRodData.label` (`BarChartRodLabel`), `BarChartRodStackItem.label` | a `ChartDataLabels` layer: `format`, `position` (outside, inside or centred) |
 | several rods per `BarChartGroupData`, `barsSpace` | one `BarSeries` per series, with the same `step` and a different `offset` |
 | a colour per rod | `BarSeries.colorOf: (index, x, y) => …` |
 
 ### Titles, grid and decorations
 
-| fl_chart 1.3.1 | plot_twist 0.1 | Notes |
+| fl_chart 1.3.1 | plot_twist 0.2 | Notes |
 |---|---|---|
 | `FlTitlesData`, `AxisTitles`, `SideTitles` | a `ChartAxis` in `left`, `top`, `right` or `bottom` | Only the sides you fill have an axis. |
 | `SideTitles.getTitlesWidget` and `SideTitleWidget` | `ChartAxis(labelBuilder: (context, tick) => …)`, or `format: (tick) => …` for text | The axis places each label. Labels are built when their tick appears, not on every frame of a pan. |
 | `TitleMeta` | `ChartTick`: `value`, `label` and `level` | `label` has as many decimals as the tick spacing needs. |
 | `SideTitles.reservedSize` | `ChartAxis(extent:)`: `.auto()` (the default), `.fixed(px)` or `.shared(group)` | `.auto()` measures the labels; `.shared` makes linked charts' axes equally thick. |
 | `AxisTitles.axisNameWidget` | another widget in the same side slot | Side slots take any widget. |
-| `FlGridData` | `ChartGrid(horizontal:, vertical:, color:, width:)` | Lines sit at the ticks of the scales. |
+| `FlGridData`, `FlLine.dashArray` | `ChartGrid(horizontal:, vertical:, color:, width:, dash:, minor:)` | Lines sit at the ticks of the scales, and with `minor:` at their minor ticks. |
 | `FlBorderData` | the axis lines (`ChartAxis(showLine:)`), or a `DecoratedBox` child | Children that are not positioned fill the plot. |
 | `backgroundColor` | a `ColoredBox` around the chart, or as its first child | |
-| `ExtraLinesData`, `HorizontalLine`, `VerticalLine` | a `ChartPainter` in `ChartPaint`, or a widget in `ChartPositioned` | [A17](https://glynskyi.github.io/plot_twist/#/a17) draws a threshold the user can drag. |
+| `ExtraLinesData`, `HorizontalLine`, `VerticalLine`, `HorizontalLineLabel`, `VerticalLineLabel` | `ChartReferenceLine.y(value, dash:, label:)` and `.x(…)` | The label is a widget. [A17](https://glynskyi.github.io/plot_twist/#/a17) draws a threshold the user can drag. |
 | `RangeAnnotations` (`HorizontalRangeAnnotation`, `VerticalRangeAnnotation`) | `ChartPositioned.span(y1: .value(a), y2: .value(b), child: …)` | The child can be any widget. |
-| `clipData` (`FlClipData`) | `clip:` on `LineSeries` and `ChartPaint`; `overflow:` on `ChartPositioned` | |
+| `clipData` (`FlClipData`) | `clip:` on every series and on `ChartPaint`; `overflow:` on `ChartPositioned` | |
 | colours given per chart | `ChartTheme` and `ChartThemeData` | Without a theme, colours come from the ambient `DefaultTextStyle`, so charts follow light and dark mode. |
 
 ### Touch and tooltips
 
-| fl_chart 1.3.1 | plot_twist 0.1 | Notes |
+| fl_chart 1.3.1 | plot_twist 0.2 | Notes |
 |---|---|---|
 | `LineTouchData`, `BarTouchData`, … with `handleBuiltInTouches` | `ChartCrosshair` and `ChartTooltip` children | Leave them out for a chart without touch handling. |
 | `touchTooltipData`, `getTooltipItems`, `LineTooltipItem`, `getTooltipColor` | `ChartTooltip(builder: (context, hits) => …)` | The builder returns any widget. `interactive: true` lets buttons inside it work; `overlay: true` lets it leave the chart. |
-| `getTouchedSpotIndicator` (`TouchedSpotIndicatorData`) | `ChartCrosshair(vertical:, horizontal:, showPoints:, color:, width:, pointRadius:)` | |
+| `getTouchedSpotIndicator` (`TouchedSpotIndicatorData`) | `ChartCrosshair(vertical:, horizontal:, showPoints:, color:, width:, dash:, pointRadius:)` | |
+| `ScatterTouchData` (the spot under the pointer) | `ChartCrosshair(mode: ChartHitMode.nearest, snapDistance: …)` | The focus snaps to the nearest point in both dimensions, and the tooltip shows that point alone. |
 | `touchCallback` and `LineTouchResponse` | `ChartController.focus` (a `ValueNotifier<ChartFocus?>`), `controller.hitsAt(x)`, `ChartGestureDetector` | The focus is in data space and can be shared between charts. |
 | `showingTooltipIndicators` | `controller.focus.value = ChartFocus(x: …)` | The crosshair and the tooltip follow it. |
 
 ### Zoom and pan
 
-| fl_chart 1.3.1 | plot_twist 0.1 | Notes |
+| fl_chart 1.3.1 | plot_twist 0.2 | Notes |
 |---|---|---|
 | `FlTransformationConfig` | a `ChartPanZoom` child | |
 | `scaleAxis` (`FlScaleAxis.horizontal`, `vertical`, `free`, `none`) | `ChartPanZoom(panX:, panY:, zoomX:, zoomY:)` | |
@@ -391,9 +394,18 @@ These parts of plot_twist have no row in the tables above.
   `ChartLayoutBuilder` builds widgets only for what is visible.
   [A3](https://glynskyi.github.io/plot_twist/#/a3),
   [A6](https://glynskyi.github.io/plot_twist/#/a6)
+- **A legend.** `ChartLegend` lists the series of a chart, in a side slot or
+  anywhere else, and reports taps so a series can be hidden. A series without
+  a colour takes the next one of the theme's palette.
+  [A20](https://glynskyi.github.io/plot_twist/#/a20)
+- **Minor ticks.** `LinearTicks(minorCount:)` and `LogTicks(minor: true)` add
+  marks between the labelled ticks, on the axis and, with
+  `ChartGrid(minor: true)`, in the grid.
+  [A14](https://glynskyi.github.io/plot_twist/#/a14)
 - **Custom series.** A `ChartSeriesPainter` implements `paint`, `bounds` and
   `collectHits`, and gets automatic ranges, the crosshair, the tooltip and a
-  legend entry. [A8](https://glynskyi.github.io/plot_twist/#/a8)
+  legend entry. With `visitMarks` it gets data labels too.
+  [A8](https://glynskyi.github.io/plot_twist/#/a8)
 - **Live data.** `.follow(span:)` keeps the newest data in view until the user
   pans. [A15](https://glynskyi.github.io/plot_twist/#/a15)
 - **Linked charts.** Charts that share a `ChartScaleController` and a focus
@@ -404,9 +416,9 @@ These parts of plot_twist have no row in the tables above.
 
 ## Not included yet
 
-- Horizontal bars, and pie, radar and gauge charts as built-in types. The
-  donut in A21 is a custom painter, and there is no polar coordinate system.
-- Hollow candles, open-high-low-close bars and financial indicators.
+- Pie, radar and gauge charts as built-in types. The donut in A21 is a custom
+  painter, and there is no polar coordinate system.
+- Financial indicators.
 - A Material theme adapter. The example's `MaterialChartTheme` helper shows
   the mapping in about 25 lines.
 - The API is 0.x and can still change. plot_twist needs Flutter 3.41 or later.
