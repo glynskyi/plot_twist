@@ -191,9 +191,11 @@ class ScatterSeriesPainter extends ChartSeriesPainter {
       final Offset p = Offset(xs.toPixel(data.x(i)), ys.toPixel(y));
       // A value the scale cannot show is not on the chart.
       if (!p.isFinite) continue;
-      final double d = query.mode == ChartHitMode.nearestX
-          ? (p.dx - query.position.dx).abs()
-          : (p - query.position).distance;
+      final double d = switch (query.mode) {
+        ChartHitMode.nearestX => (p.dx - query.position.dx).abs(),
+        ChartHitMode.nearestY => (p.dy - query.position.dy).abs(),
+        ChartHitMode.nearest => (p - query.position).distance,
+      };
       if (d <= bestDistance) {
         bestDistance = d;
         best = i;

@@ -8,7 +8,8 @@ typedef ChartTooltipBuilder = Widget Function(BuildContext context, List<ChartHi
 /// Shows a widget next to the data the user points at.
 ///
 /// The tooltip follows `ChartController.focus` (set by `ChartCrosshair`, or by
-/// your own code). Its content is an ordinary widget built by [builder] — it
+/// your own code) and lists the data points that focus stands for: see
+/// `ChartController.hitsFor`. Its content is an ordinary widget built by [builder] — it
 /// can hold images, charts or buttons — and is rebuilt only when the
 /// pointed-at data changes; while the chart is panned it just moves.
 ///
@@ -21,6 +22,7 @@ class ChartTooltip extends StatelessWidget {
     super.key,
     this.builder,
     this.xScale = kChartX,
+    this.yScale = kChartY,
     this.alignment = Alignment.bottomCenter,
     this.offset = const Offset(0, -12),
     this.interactive = false,
@@ -32,6 +34,11 @@ class ChartTooltip extends StatelessWidget {
 
   /// Id of the horizontal scale the focus is on.
   final Object xScale;
+
+  /// Id of the vertical scale the focus is on. It matters when the focus
+  /// stands for points at a y or at a position, as set by a `ChartCrosshair`
+  /// with another `mode` than the default; give both the same scale.
+  final Object yScale;
 
   /// Which point of the tooltip sits on the anchor. The default puts the
   /// tooltip above the point.
@@ -64,7 +71,7 @@ class ChartTooltip extends StatelessWidget {
       builder: (BuildContext context, ChartFocus? focus, Widget? child) {
         if (focus == null) return const SizedBox.shrink();
         List<ChartHit> hitsIn(ChartView view) =>
-            controller.hitsAt(focus.x, xScale: xScale, view: view);
+            controller.hitsFor(focus, xScale: xScale, yScale: yScale, view: view);
         return ChartLayoutBuilder<ChartHitSet>(
           selector: (ChartView view) => ChartHitSet(hitsIn(view)),
           builder: (BuildContext context, ChartHitSet set) {
@@ -133,7 +140,7 @@ class ChartTooltip extends StatelessWidget {
                         ),
                       ),
                     if (hit.series?.label != null) Text('${hit.series!.label}: '),
-                    Text(ChartTicks.formatNumber(hit.y)),
+                    Text(ChartTicks.formatNumber(hit.value)),
                   ],
                 ),
             ],

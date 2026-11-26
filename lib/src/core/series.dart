@@ -1,6 +1,7 @@
 import 'dart:ui' show Color, Offset, Rect;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart' show Axis;
 
 import 'chart_view.dart';
 import 'range.dart';
@@ -13,6 +14,11 @@ enum ChartHitMode {
 
   /// The closest point by on-screen distance. Best for scatter plots.
   nearest,
+
+  /// The closest point along the y scale, one per series. Best for
+  /// horizontal bars. Series whose rows run along x, such as lines, vertical
+  /// bars and candlesticks, add no hit.
+  nearestY,
 }
 
 /// A request to find the data under (or near) a position.
@@ -52,12 +58,14 @@ class ChartHit {
     this.series,
     this.datum,
     this.rect,
+    this.base,
+    this.valueAxis = Axis.vertical,
   });
 
-  /// The x value of the data point.
+  /// The position of the data point on the horizontal scale.
   final double x;
 
-  /// The y value of the data point.
+  /// The position of the data point on the vertical scale.
   final double y;
 
   /// Plot-local pixel position of the data point.
@@ -78,6 +86,21 @@ class ChartHit {
   /// The on-screen rectangle of the mark (for bars and similar), if any.
   final Rect? rect;
 
+  /// The value the mark starts from, if it has one: the baseline of a bar, or
+  /// the top of the layer below it in a stack. [value] minus [base] is then
+  /// the size of the mark itself.
+  final double? base;
+
+  /// The direction the value runs in: vertical, except for horizontal bars.
+  final Axis valueAxis;
+
+  /// The value of the data point: [y], or [x] for a horizontal bar.
+  double get value => valueAxis == Axis.vertical ? y : x;
+
+  /// Where the data point sits along its series: [x], or [y] for a
+  /// horizontal bar.
+  double get argument => valueAxis == Axis.vertical ? x : y;
+
   /// A copy of this hit attributed to [series].
   ChartHit withSeries(ChartSeries series) => ChartHit(
     x: x,
@@ -88,6 +111,8 @@ class ChartHit {
     series: series,
     datum: datum,
     rect: rect,
+    base: base,
+    valueAxis: valueAxis,
   );
 
   /// Whether this hit refers to the same data point as [other], regardless of

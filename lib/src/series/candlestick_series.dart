@@ -323,7 +323,8 @@ class CandlestickSeriesPainter extends ChartSeriesPainter {
 
   @override
   void collectHits(ChartHitQuery query, List<ChartHit> hits) {
-    if (data.isEmpty) return;
+    // The rows run along x, so none of them is the one at a given y.
+    if (data.isEmpty || query.mode == ChartHitMode.nearestY) return;
     final ChartView view = query.view;
     if (!view.scales.containsKey(xScale) || !view.scales.containsKey(yScale)) return;
     final ChartScaleView xs = view.scale(xScale);

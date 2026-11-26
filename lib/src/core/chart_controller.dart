@@ -16,7 +16,7 @@ import 'series.dart';
 @immutable
 class ChartFocus {
   /// Creates a focus at data value [x], optionally with a [y].
-  const ChartFocus({required this.x, this.y, this.source});
+  const ChartFocus({required this.x, this.y, this.mode = ChartHitMode.nearestX, this.source});
 
   /// Position on the x scale, in data units.
   final double x;
@@ -24,19 +24,27 @@ class ChartFocus {
   /// Position on the y scale of the chart that produced the focus, if known.
   final double? y;
 
+  /// Which data points the focus stands for: those at [x], those at [y], or
+  /// the ones at exactly this position. See `ChartController.hitsFor`.
+  final ChartHitMode mode;
+
   /// The controller of the chart the pointer is in. Linked charts use this to
   /// tell their own focus from a mirrored one.
   final Object? source;
 
   @override
   bool operator ==(Object other) =>
-      other is ChartFocus && other.x == x && other.y == y && identical(other.source, source);
+      other is ChartFocus &&
+      other.x == x &&
+      other.y == y &&
+      other.mode == mode &&
+      identical(other.source, source);
 
   @override
-  int get hashCode => Object.hash(x, y, source);
+  int get hashCode => Object.hash(x, y, mode, source);
 
   @override
-  String toString() => 'ChartFocus($x, $y)';
+  String toString() => 'ChartFocus($x, $y, ${mode.name})';
 }
 
 // Series come and go with the widget lifecycle, so their listeners (which may
@@ -321,6 +329,43 @@ class ChartController {
     final ChartView? v = view ?? _view;
     if (v == null || !v.scales.containsKey(xScale)) return const <ChartHit>[];
     return hitTest(Offset(v.scale(xScale).toPixel(x), v.size.height / 2), view: v);
+  }
+
+  /// The data points [focus] stands for. This is what a crosshair marks and
+  /// a tooltip lists.
+  ///
+  ///  * `nearestX`: the point of each series closest to the focused x.
+  ///  * `nearestY`: the point of each series closest to the focused y.
+  ///  * `nearest`: the points at the focused position, so nothing when the
+  ///    focus is not on a point. A focus that has no y, or that comes from
+  ///    another chart, whose y scale is not this one's, is matched along x.
+  ///
+  /// [xScale] and [yScale] are the scales the focus is measured on.
+  List<ChartHit> hitsFor(
+    ChartFocus focus, {
+    Object xScale = kChartX,
+    Object yScale = kChartY,
+    ChartView? view,
+  }) {
+    final ChartView? v = view ?? _view;
+    if (v == null) return const <ChartHit>[];
+    final double? x = v.scales.containsKey(xScale) ? v.scale(xScale).toPixel(focus.x) : null;
+    final double? focusY = focus.y;
+    final double? y = focusY != null && v.scales.containsKey(yScale)
+        ? v.scale(yScale).toPixel(focusY)
+        : null;
+    final bool own = focus.source == null || identical(focus.source, this);
+    switch (focus.mode) {
+      case ChartHitMode.nearest when y != null && own:
+        if (x == null) return const <ChartHit>[];
+        return hitTest(Offset(x, y), mode: ChartHitMode.nearest, maxDistance: 0.5, view: v);
+      case ChartHitMode.nearestY:
+        if (y == null) return const <ChartHit>[];
+        return hitTest(Offset(v.size.width / 2, y), mode: ChartHitMode.nearestY, view: v);
+      case ChartHitMode.nearestX || ChartHitMode.nearest:
+        if (x == null) return const <ChartHit>[];
+        return hitTest(Offset(x, v.size.height / 2), view: v);
+    }
   }
 
   // ------------------------------------------------- pixel-space helpers

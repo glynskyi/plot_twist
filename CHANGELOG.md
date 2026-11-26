@@ -29,8 +29,24 @@ The painters of the three series are renamed in the same way.
 - `color` of `LineSeriesPainter`, `BarSeriesPainter` and `ScatterSeriesPainter`
   is optional and nullable. Null paints with `ChartPaintContext.seriesColor`.
 
+- `ChartHitMode` has a third value, `nearestY`. A `switch` over the modes in a
+  series of your own needs a case for it; a series whose rows run along x
+  adds no hit there.
+- The default tooltip shows `ChartHit.value`, which is `y` for everything
+  except horizontal bars.
+
 ### New
 
+- `ChartCrosshair(mode:)`: `ChartHitMode.nearest` snaps to the closest point
+  in both dimensions, so a tooltip on a scatter plot shows the dot under the
+  pointer. `ChartHitMode.nearestY` snaps along y, for horizontal bars. The
+  mode is stored in `ChartFocus.mode`, and `ChartController.hitsFor(focus)`
+  returns the data points a focus stands for. `snapDistance` limits how far
+  the focus snaps.
+- `ChartTooltip(yScale:)`, for a focus measured on another vertical scale.
+- `ChartHit.base`, `ChartHit.valueAxis`, `ChartHit.value` and
+  `ChartHit.argument`. A bar's hit carries the value it starts from, so a
+  tooltip can show the size of one layer of a stack.
 - `ChartPaintContext.seriesColor`: the colour of the layer being painted, for
   painters of your own.
 - `clip` on `BarSeries`, `ScatterSeries` and `CandlestickSeries`, as on
