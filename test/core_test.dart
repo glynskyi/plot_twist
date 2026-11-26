@@ -422,6 +422,10 @@ void main() {
           }
           expect(d.minMax(a, b), (lo, hi), reason: 'rows [$a, $b)');
           final (int minIndex, int maxIndex) = d.argMinMax(a, b);
+          if (lo > hi) {
+            expect((minIndex, maxIndex), (-1, -1), reason: 'no value in rows [$a, $b)');
+            continue;
+          }
           expect(ys[minIndex], lo);
           expect(ys[maxIndex], hi);
           expect(minIndex >= a && minIndex < b && maxIndex >= a && maxIndex < b, isTrue);
@@ -445,6 +449,43 @@ void main() {
       d.prependAll(<double>[-2, -1], <double>[9999, -9999]);
       ys.insertAll(0, <double>[9999, -9999]);
       check();
+      // Changing values in place updates it, whatever the new value: larger,
+      // smaller, missing or infinite, and also in the last, partial block.
+      expect(d.length % 64, isNot(0));
+      for (int k = 0; k < 2000; k++) {
+        final int i = k % 10 == 0 ? d.length - 1 - random.nextInt(20) : random.nextInt(d.length);
+        final double v = switch (random.nextInt(8)) {
+          0 => double.nan,
+          1 => double.infinity,
+          2 => -1e6 - random.nextDouble(),
+          3 => 1e6 + random.nextDouble(),
+          _ => random.nextDouble() * 1000 - 500,
+        };
+        d.setValue(i, v);
+        ys[i] = v.isFinite ? v : double.nan;
+        if (k % 250 == 249) check();
+      }
+      check();
+    });
+
+    test('changing a value of one column leaves the index of the others', () {
+      final ChartData d = ChartData(valueColumns: 2);
+      d.addRows(List<double>.generate(5000, (int i) => i.toDouble()), <List<double>>[
+        List<double>.generate(5000, (int i) => (i % 100).toDouble()),
+        List<double>.generate(5000, (int i) => -(i % 100).toDouble()),
+      ]);
+      expect(d.valueExtent(), const ChartRange(0, 99));
+      expect(d.valueExtent(column: 1), const ChartRange(-99, 0));
+      d.setValue(4321, 500, column: 1);
+      expect(d.valueExtent(), const ChartRange(0, 99));
+      expect(d.valueExtent(column: 1), const ChartRange(-99, 500));
+      expect(d.minMax(4000, 4300, column: 1), (-99.0, 0.0));
+      d.setValue(4321, -40, column: 1);
+      expect(d.valueExtent(column: 1), const ChartRange(-99, 0));
+      // The row just appended after a change is still part of its block.
+      d.addRow(5000, <double>[1000, -1000]);
+      expect(d.valueExtent(), const ChartRange(0, 1000));
+      expect(d.valueExtent(column: 1), const ChartRange(-1000, 0));
     });
 
     test('infinite values are missing data for extents, with or without the index', () {

@@ -297,10 +297,15 @@ class ChartData extends ChangeNotifier {
   }
 
   /// Changes one value in place — for example the still-forming last point.
+  ///
+  /// The min/max index of [column] is updated, not rebuilt, so this stays
+  /// cheap on large stores.
   void setValue(int index, double value, {int column = 0}) {
     RangeError.checkValidIndex(index, this, 'index', _length);
-    _columns[column + 1][_start + index] = value;
-    _changed(invalidateIndexes: true);
+    final Float64List values = _columns[column + 1];
+    values[_start + index] = value;
+    _indexes[column]?.update(values, _start, index);
+    _changed();
   }
 
   /// Removes all rows.
@@ -591,6 +596,33 @@ class _MinMaxIndex {
       if (v > _max1[big]) _max1[big] = v;
     }
     _rows++;
+  }
+
+  /// Recomputes the blocks holding [row] after its value changed.
+  void update(Float64List column, int base, int row) {
+    assert(row < _rows);
+    final int block = row ~/ _b0;
+    double lo = double.infinity;
+    double hi = double.negativeInfinity;
+    final int end = math.min(_rows, (block + 1) * _b0);
+    for (int i = block * _b0; i < end; i++) {
+      final double v = column[base + i];
+      if (!v.isFinite) continue;
+      if (v < lo) lo = v;
+      if (v > hi) hi = v;
+    }
+    _min0[block] = lo;
+    _max0[block] = hi;
+    final int big = block ~/ _b1;
+    final int blocks = (_rows + _b0 - 1) ~/ _b0;
+    lo = double.infinity;
+    hi = double.negativeInfinity;
+    for (int b = big * _b1; b < math.min(blocks, (big + 1) * _b1); b++) {
+      if (_min0[b] < lo) lo = _min0[b];
+      if (_max0[b] > hi) hi = _max0[b];
+    }
+    _min1[big] = lo;
+    _max1[big] = hi;
   }
 
   // Like [query], but returns the row indices of the extremes. Finds the
