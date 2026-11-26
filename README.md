@@ -89,6 +89,8 @@ stay cheap.
 
 Coming from fl_chart? [doc/coming_from_fl_chart.md](doc/coming_from_fl_chart.md)
 maps its concepts onto plot_twist and shows three charts written in both.
+[doc/coming_from_charts_flutter.md](doc/coming_from_charts_flutter.md) does
+the same for charts_flutter and its forks, such as community_charts_flutter.
 
 ## How it works
 

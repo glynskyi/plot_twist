@@ -61,7 +61,7 @@ The 26 demos have 2,211 such lines in total, 85 on average.
 | A18 | Accessibility | should | `a18_accessibility.dart` | 95 | `Chart.semanticLabel`, `ChartLayoutBuilder` |
 | A19 | Animated transitions | should | `a19_transitions.dart` | 78 | `AnimatedChartData`, `BarSeries(direction:)`, `ChartDataLabels` |
 | A20 | Legend outside the chart | should | `a20_legend.dart` | 68 | `ChartLegend`, `ChartController.series` |
-| A21 | Non-Cartesian content | should | `a21_donut.dart` | 119 | `ChartPainter`, `ChartPositioned.resolve` |
+| A21 | Pie, gauge and radar | should | `a21_polar.dart` | 113 | `PolarChart`, `PieSeries`, `RadialBarSeries`, `RadarSeries` |
 | A22 | Data-driven styling | nice | `a22_styling.dart` | 86 | `LineSeries.shader`, `ChartTheme` |
 | A23 | Navigator by composition | nice | `a23_navigator.dart` | 90 | `ChartPositioned.span`, `panBy` |
 | A24 | Many small charts | nice | `a24_sparklines.dart` | 65 | `Chart(isolate: false)` |
@@ -592,26 +592,45 @@ list.
 shows only that one. The four series have no colour of their own: each takes
 the next colour of the theme's palette.
 
-## A21. Non-Cartesian content
+## A21. Pie, gauge and radar
 
-**What it is.** A pie, donut or gauge on the same core, with the same widgets
-and interactions.
+**What it is.** A pie or doughnut, a gauge and a radar chart on the same core,
+with the same widgets and interactions.
 
 **Why it matters.**
 
 - Circular charts are often a separate widget stack, with interactions of
   their own and none of the Cartesian chart's tools.
-- Users ask for gauges, which no built-in chart type covers.
+- A pie, a progress ring or a gauge is often the one chart of another kind
+  that an app needs next to its lines and bars. A second package for it means
+  a second theme, a second tooltip and a second way to animate.
 
-**In plot_twist.** Nothing in `Chart` requires axes. A `ChartPainter` gets the
-plot size and draws anything. `ChartPositioned.resolve` places widgets from
-the painter's own geometry, and `ChartGestureDetector(onPointerHover: …)`
-gives hover and tap.
+**In plot_twist.** A `PolarChart` is a `Chart` with two more scales and a
+frame that says how they lie on a circle: the angle scale runs around the
+centre and the radius scale from the centre outwards. `PieSeries`,
+`RadialBarSeries` and `RadarSeries` are painters on the public series
+contract. They report their data to the scales, answer hit queries with the
+slice, bar or corner at a position, and list what they show. So the layers
+that the Cartesian series use work unchanged:
 
-**Demo.** A donut with a widget in the centre, a widget label per slice and a
-hover tooltip. The geometry (angles, hit testing) is 24 lines in the demo.
-plot_twist has no polar coordinate system of its own, and the radar chart
-planned for this demo was dropped to keep the file under the line limit.
+- `ChartLegend` shows one item per series, or per slice of a pie.
+- `ChartCrosshair.point` and `ChartTooltip` follow the pointer.
+- `ChartDataLabels` writes in the middle of a slice, at its rim or outside it.
+- `ChartAppear` grows a series out of the centre or uncovers it around it,
+  and `AnimatedChartData` moves slices, bars and corners to new values.
+
+Any widget still goes over the plot, and `ChartPolarPositioned` places one by
+an angle and a radius. A chart that turns less than a whole circle is laid
+out so that the drawn part fills the plot.
+
+**Demo.** A doughnut whose legend pulls a slice out, with the share written
+on every slice and a total in the hole. A gauge on three quarters of a circle
+that follows a slider. A radar chart of two series whose tooltip lists both
+at the category under the pointer.
+
+A polar chart is not panned or zoomed. Bars that stand around the circle (a
+rose chart) and leader lines from a pie to its outside labels are not built
+in.
 
 ## A22. Data-driven styling
 
@@ -744,8 +763,8 @@ quoted under A10.
 - **Automated.** `example/test/demos_test.dart` runs every demo with a real
   font: it builds it, hovers, drags, scrolls the wheel, disposes it, and fails
   on any exception. It also writes a screenshot of each demo to
-  `example/build/screenshots/`. A18, A19 and A26 have a test of their own for
-  what their descriptions claim.
+  `example/build/screenshots/`. A18, A19, A21 and A26 have a test of their own
+  for what their descriptions claim.
 - **By hand.** Every demo was driven in Chrome on the web build: each
   behavior its description names was tried and seen to work.
 - **Package tests.** The mechanisms behind the demos have their own tests in
@@ -757,8 +776,8 @@ quoted under A10.
 
 ## Considered and left out
 
-- **More chart types** (sankey, treemap, funnel, 3D, maps). A8 and A21 cover
-  how to write them.
+- **More chart types** (sankey, treemap, funnel, 3D, maps). A8 shows how to
+  write a series, and `ChartPolar.resolve` gives one on a circle its geometry.
 - **Financial indicators, regression lines and aggregation.** These are data
   transforms and belong to the app.
 - **A grammar or fluent syntax.** It can be added on top later.

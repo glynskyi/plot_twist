@@ -211,6 +211,7 @@ These are listed from the easiest to the most powerful.
 | `ChartLayoutBuilder<T>` | a selector `(view) => T` and a builder | widgets built for what is visible |
 | `ChartPaint` and `ChartPainter` | `paint(context)` with a canvas and the view | bands, thresholds, any drawing |
 | `ChartSeriesPainter` | `paint`, `bounds`, `collectHits`, `valueAt`, `visitMarks` | a series with automatic ranges, tooltips, data labels, a palette colour and a legend entry |
+| `ChartPolar` in a `ChartSeriesPainter` | the same methods, with positions from `ChartPolar.resolve(view)` and hits that carry a `ChartSector` | a series around a circle, as the pie, radial bar and radar series are |
 | `ChartScale` and `ChartTicks` | a transform and its inverse; a tick generator | log, time, category and custom scales |
 | `ChartGestureDetector` and the controller API | recognizers and callbacks | custom interactions |
 | `ChartAxis` and `ChartAxisMarker` | a label builder; widgets pinned to a value in the gutter | widget tick labels, value pills |
@@ -266,8 +267,12 @@ of ticks changes (`test/axis_test.dart`).
   `liveScaleView` gives the current mapping of one scale.
 - The gutter loop is capped at three passes. Side widgets whose thickness
   keeps changing with the plot size settle on the third measurement.
-- The coordinate system is Cartesian. Polar charts are drawn by a painter that
-  does its own geometry, as the donut demo does.
+- The chart itself is Cartesian. A polar chart is a projection made by its
+  painters: `ChartPolar.resolve(view)` turns the angle scale and the radius
+  scale into positions on a circle. The side slots, `ChartPositioned` anchors,
+  pan and zoom and the lines of a crosshair do not follow it. So a polar
+  chart is not panned or zoomed, and its series are hit by position
+  (`ChartHitMode.nearest`) only.
 - A scale's transform must be strictly increasing. A scale that folds or
   repeats values cannot be expressed.
 
@@ -275,13 +280,13 @@ of ticks changes (`test/axis_test.dart`).
 
 ```
 lib/plot_twist.dart      the public library
-lib/src/core/            ranges, scales, ticks, controllers, the view, the series contract
+lib/src/core/            ranges, scales, ticks, controllers, the view, the series contract, the polar frame
 lib/src/data/            ChartData
 lib/src/rendering/       the chart, stack and axis render objects, the view channel
-lib/src/widgets/         Chart, ChartStack, ChartPositioned, ChartPaint, ChartAxis, themes
+lib/src/widgets/         Chart, PolarChart, ChartStack, ChartPositioned, ChartPaint, ChartAxis, themes
 lib/src/interaction/     the pointer hub and the pan and zoom recognizer
-lib/src/series/          line, bar, scatter, candlestick  (public API only)
-lib/src/layers/          the grid, reference lines, data labels, the legend  (public API only)
+lib/src/series/          line, bar, scatter, candlestick, pie, radial bar, radar  (public API only)
+lib/src/layers/          grids, reference lines, data labels, the legend, the polar axis, the needle  (public API only)
 lib/src/behaviors/       pan and zoom, crosshair, tooltip, loader, animated data, appear  (public API only)
 ```
 

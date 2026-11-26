@@ -5,8 +5,9 @@ charts written with each. It is meant for porting an existing chart one at a
 time.
 
 The fl_chart names on this page were verified against fl_chart 1.3.1 on
-13 November 2026, and its three examples compile against that version. The
-plot_twist examples compile against plot_twist 0.2.0.
+13 November 2026 (the pie, radar and gauge rows on 27 November 2026), and its
+three examples compile against that version. The plot_twist examples are
+compiled and run by `test/guides_test.dart`.
 
 ## The differences that matter most
 
@@ -34,11 +35,20 @@ plot_twist examples compile against plot_twist 0.2.0.
 
 ### Charts and data
 
-| fl_chart 1.3.1 | plot_twist 0.2 | Notes |
+| fl_chart 1.3.1 | plot_twist 0.3 | Notes |
 |---|---|---|
 | `LineChart`, `BarChart`, `ScatterChart`, `CandlestickChart` | `Chart` with `LineSeries`, `BarSeries`, `ScatterSeries` or `CandlestickSeries` children | Series of different kinds can share one chart. |
 | `LineChartData`, `BarChartData`, `ScatterChartData`, `CandlestickChartData` | the arguments of `Chart`: scales, side slots and children | |
-| `PieChart`, `RadarChart`, `GaugeChart` | not built in | A `ChartPainter` in `ChartPaint` can draw one. [A21](https://glynskyi.github.io/plot_twist/#/a21) draws a donut in its demo file. |
+| `PieChart` with `PieChartSectionData(value:, color:, title:)` | `PolarChart` with a `PieSeries` | One slice per row of a `ChartData`. Slices take the colours of the palette, or `colorOf`. [A21](https://glynskyi.github.io/plot_twist/#/a21) |
+| `centerSpaceRadius`, `sectionsSpace`, `startDegreeOffset` | `PolarChart(innerRadius:, startAngle:)`, `PieSeries(gap:)` | `innerRadius` is a fraction of the outer radius. Angles are in radians. A widget for the centre is a child of the chart, such as a `Center`. |
+| `PieChartSectionData.title`, `titlePositionPercentageOffset`, `badgeWidget` | `ChartDataLabels(position:, format:)`, `ChartPolarPositioned` | The labels layer writes in the middle of a slice, at its rim or outside it. A badge is a widget placed by an angle and a radius. |
+| a larger `radius` for the touched section | `PieSeries(offsetOf:)` | Pulls a slice out along its middle. |
+| `PieTouchData(touchCallback:)` | `ChartCrosshair.point()` with a `ChartTooltip`, or `ChartController.hitTest(position, mode: ChartHitMode.nearest)` | A hit carries the `index`, the `label`, the `color` and the `sector` of the slice. |
+| `RadarChart` with `RadarDataSet(dataEntries:)` | `PolarChart` with one `RadarSeries` per data set | The angle scale is a band scale that names the categories (`getTitle`); the radius scale is linear. |
+| `radarShape`, `tickCount`, `getTitle`, `ticksTextStyle` | `ChartPolarGrid(shape:)`, the ticks of the radius scale, `ChartPolarAxis.angle()`, `ChartPolarAxis.radius()` | |
+| `GaugeChart` with a `GaugeProgressRing` | `PolarChart` with a `RadialBarSeries` | `minValue` and `maxValue` are the `FixedRange` of the angle scale; `startDegreeOffset` and `sweepAngle` are `startAngle` and `sweepAngle`, in radians. |
+| `GaugeZonesRing` with `GaugeZone`s | a `RadialBarSeries` with a `baseColumn`, or `colorOf` | One row per zone, from its start to its end. |
+| `GaugePointer`, `GaugeTicks`, `GaugeMarker` | `ChartNeedle(value:)`, `ChartPolarAxis.angle(tickLength:)`, `ChartPolarPositioned` | |
 | `rotationQuarterTurns` (horizontal bar charts) | `BarSeries(direction: Axis.horizontal)` | The data stays as it is: the rows run along the vertical scale. Use `ChartCrosshair(mode: ChartHitMode.nearestY)` with it. |
 | lists of `FlSpot(x, y)` | `ChartData.fromXY(xs, ys)`, `ChartData.fromValues(ys)`, `ChartData.from<T>(items, x:, y:, more:)`, `ChartData.generate` | Change it in place with `add`, `addAll`, `addRow`, `prependAll`, `prependRows`, `removeFirst`, `setValue` or `replaceAll`. |
 | `FlSpot.nullSpot` | `double.nan` as a value | A NaN leaves a gap in a line. |
@@ -48,7 +58,7 @@ plot_twist examples compile against plot_twist 0.2.0.
 
 ### Scales and ranges
 
-| fl_chart 1.3.1 | plot_twist 0.2 | Notes |
+| fl_chart 1.3.1 | plot_twist 0.3 | Notes |
 |---|---|---|
 | `minX`, `maxX`, `minY`, `maxY` | the scale's `range`: `.fixed(min, max)`, `.fit()`, `.fitVisible()` or `.follow(span:)` | `.fitVisible()` fits Y to the data inside the visible X window. |
 | x values in `millisecondsSinceEpoch` | `ChartScale.time()` and `DateTime.chartValue` | Ticks follow the calendar and change unit with the zoom. |
@@ -58,7 +68,7 @@ plot_twist examples compile against plot_twist 0.2.0.
 
 ### Series styling
 
-| fl_chart 1.3.1 | plot_twist 0.2 |
+| fl_chart 1.3.1 | plot_twist 0.3 |
 |---|---|
 | `LineChartBarData.color`, `barWidth` | `LineSeries.color`, `width` |
 | `isCurved` | `curve: LineCurve.smooth` (monotone: it never overshoots the data) |
@@ -78,7 +88,7 @@ plot_twist examples compile against plot_twist 0.2.0.
 
 ### Titles, grid and decorations
 
-| fl_chart 1.3.1 | plot_twist 0.2 | Notes |
+| fl_chart 1.3.1 | plot_twist 0.3 | Notes |
 |---|---|---|
 | `FlTitlesData`, `AxisTitles`, `SideTitles` | a `ChartAxis` in `left`, `top`, `right` or `bottom` | Only the sides you fill have an axis. |
 | `SideTitles.getTitlesWidget` and `SideTitleWidget` | `ChartAxis(labelBuilder: (context, tick) => …)`, or `format: (tick) => …` for text | The axis places each label. Labels are built when their tick appears, not on every frame of a pan. |
@@ -95,7 +105,7 @@ plot_twist examples compile against plot_twist 0.2.0.
 
 ### Touch and tooltips
 
-| fl_chart 1.3.1 | plot_twist 0.2 | Notes |
+| fl_chart 1.3.1 | plot_twist 0.3 | Notes |
 |---|---|---|
 | `LineTouchData`, `BarTouchData`, … with `handleBuiltInTouches` | `ChartCrosshair` and `ChartTooltip` children | Leave them out for a chart without touch handling. |
 | `touchTooltipData`, `getTooltipItems`, `LineTooltipItem`, `getTooltipColor` | `ChartTooltip(builder: (context, hits) => …)` | The builder returns any widget. `interactive: true` lets buttons inside it work; `overlay: true` lets it leave the chart. |
@@ -106,7 +116,7 @@ plot_twist examples compile against plot_twist 0.2.0.
 
 ### Zoom and pan
 
-| fl_chart 1.3.1 | plot_twist 0.2 | Notes |
+| fl_chart 1.3.1 | plot_twist 0.3 | Notes |
 |---|---|---|
 | `FlTransformationConfig` | a `ChartPanZoom` child | |
 | `scaleAxis` (`FlScaleAxis.horizontal`, `vertical`, `free`, `none`) | `ChartPanZoom(panX:, panY:, zoomX:, zoomY:)` | |
@@ -416,8 +426,8 @@ These parts of plot_twist have no row in the tables above.
 
 ## Not included yet
 
-- Pie, radar and gauge charts as built-in types. The donut in A21 is a custom
-  painter, and there is no polar coordinate system.
+- In a polar chart: pan and zoom, gradients per slice, borders around slices
+  and leader lines to labels outside a pie.
 - Financial indicators.
 - A Material theme adapter. The example's `MaterialChartTheme` helper shows
   the mapping in about 25 lines.
