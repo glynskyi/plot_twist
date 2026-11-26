@@ -144,4 +144,110 @@ void main() {
     await tester.pump();
     expect(markerCenter(tester).dy, moreOrLessEquals(plotHeight / 2, epsilon: 1e-6));
   });
+
+  testWidgets('an axis in the top slot takes its room above the plot', (WidgetTester tester) async {
+    final ChartController controller = ChartController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      host(
+        Chart(
+          controller: controller,
+          x: const LinearScale(range: FixedRange(0, 100)),
+          y: const LinearScale(range: FixedRange(0, 50)),
+          top: const <Widget>[ChartAxis()],
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+    final ChartView view = controller.view!;
+    final Size axis = tester.getSize(find.byType(ChartAxis));
+    expect(axis.height, greaterThan(0));
+    expect(axis.width, 400);
+    expect(view.size, Size(400, 300 - axis.height));
+    expect(view.chartRect, Rect.fromLTWH(0, -axis.height, 400, 300));
+    // A top axis shows the x scale, and its labels sit above the plot.
+    final Offset label = tester.getCenter(find.text('50'));
+    expect(label.dx, moreOrLessEquals(view.x.toPixel(50), epsilon: 0.5));
+    expect(label.dy, lessThan(axis.height));
+  });
+
+  testWidgets('a second horizontal scale has its own axis and its own series', (
+    WidgetTester tester,
+  ) async {
+    final ChartController controller = ChartController();
+    addTearDown(controller.dispose);
+    final ChartData data = ChartData.fromXY(<double>[2, 8], <double>[2, 8]);
+    await tester.pumpWidget(
+      host(
+        Chart(
+          controller: controller,
+          x: const LinearScale(range: FixedRange(0, 100)),
+          y: const LinearScale(range: FixedRange(0, 10)),
+          xScales: const <Object, ChartScale>{'t': LinearScale(range: FixedRange(0, 10))},
+          top: const <Widget>[ChartAxis(scale: 't')],
+          bottom: const <Widget>[ChartAxis()],
+          children: <Widget>[LineSeries(data: data, xScale: 't')],
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+    final ChartView view = controller.view!;
+    final ChartScaleView t = view.scale('t');
+    expect(t.direction, Axis.horizontal);
+    expect(t.range, const ChartRange(0, 10));
+    expect(t.toPixel(5), view.size.width / 2);
+    expect(view.x.toPixel(50), view.size.width / 2);
+    // Each axis labels its own scale.
+    final Size top = tester.getSize(find.byType(ChartAxis).first);
+    expect(tester.getCenter(find.text('100')).dy, greaterThan(top.height + view.size.height));
+    expect(tester.getCenter(find.text('7.5')).dy, lessThan(top.height));
+    expect(tester.getCenter(find.text('7.5')).dx, moreOrLessEquals(t.toPixel(7.5), epsilon: 0.5));
+    // The series is drawn and hit on the second scale.
+    final ChartHit hit = controller.hitTest(Offset(t.toPixel(8), 10)).single;
+    expect(hit.x, 8);
+    expect(hit.position, Offset(t.toPixel(8), view.y.toPixel(8)));
+  });
+
+  testWidgets('a reversed scale flips pixels, positioned widgets and panning', (
+    WidgetTester tester,
+  ) async {
+    final ChartController controller = ChartController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      host(
+        Chart(
+          controller: controller,
+          x: const LinearScale(range: FixedRange(0, 100), reversed: true),
+          y: const LinearScale(range: FixedRange(0, 100), reversed: true),
+          children: const <Widget>[
+            ChartPanZoom(inertia: false, panY: true),
+            ChartPositioned(
+              x: ChartAnchor.value(25),
+              y: ChartAnchor.value(25),
+              child: SizedBox(key: Key('marker'), width: 10, height: 10),
+            ),
+          ],
+        ),
+      ),
+    );
+    final ChartView view = controller.view!;
+    // x grows to the left and y grows downwards.
+    expect(view.x.toPixel(0), 400);
+    expect(view.x.toPixel(100), 0);
+    expect(view.y.toPixel(0), 0);
+    expect(view.y.toPixel(100), 300);
+    expect(view.x.toValue(100), 75);
+    expect(markerCenter(tester), const Offset(300, 75));
+
+    // Dragging the content 80 px to the left brings lower x values in on the
+    // right: the value under the finger stays under the finger.
+    final TestGesture gesture = await tester.startGesture(const Offset(200, 150));
+    await gesture.moveBy(const Offset(-20, 0));
+    await gesture.moveBy(const Offset(-80, 0));
+    await gesture.up();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(controller.x.min, moreOrLessEquals(-20, epsilon: 1e-9));
+    expect(controller.x.max, moreOrLessEquals(80, epsilon: 1e-9));
+    expect(markerCenter(tester).dx, moreOrLessEquals(220, epsilon: 1e-6));
+  });
 }

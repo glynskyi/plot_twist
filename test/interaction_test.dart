@@ -364,4 +364,63 @@ void main() {
     expect(c.x.range, const ChartRange(110, 160), reason: 'the view did not move');
     expect(data.firstOrdinal, -50);
   });
+
+  testWidgets('the loader asks for newer data near the last loaded value, until there is none', (
+    WidgetTester tester,
+  ) async {
+    final ChartController c = ChartController();
+    addTearDown(c.dispose);
+    final ChartData data = ChartData.generate(101, (int i) => (i.toDouble(), i.toDouble()));
+    final List<bool> loading = <bool>[];
+    int loads = 0;
+    await tester.pumpWidget(
+      host(
+        Chart(
+          controller: c,
+          x: const LinearScale(range: FixedRange(0, 50)),
+          y: _y,
+          children: <Widget>[
+            LineSeries(data: data),
+            ChartLoader(
+              data: data,
+              prefetch: 0.5,
+              onLoadingChanged: loading.add,
+              onLoadAfter: () async {
+                loads++;
+                final double last = data.x(data.length - 1);
+                data.addAll(
+                  List<double>.generate(50, (int i) => last + 1 + i),
+                  List<double>.filled(50, 1),
+                );
+                return last + 50 < 200;
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(loads, 0, reason: 'far from the loaded edge');
+
+    // Within half a window of the last loaded value (100).
+    c.x.jumpTo(40, 90);
+    await tester.pump();
+    await tester.pump();
+    expect(loads, 1);
+    expect(data.x(data.length - 1), 150);
+    expect(data.firstOrdinal, 0, reason: 'rows added at the end keep their ordinals');
+    expect(c.x.range, const ChartRange(40, 90), reason: 'the view did not move');
+    expect(loading, <bool>[true, false]);
+
+    // The second page is the last one: the callback completed with false.
+    c.x.jumpTo(120, 170);
+    await tester.pump();
+    await tester.pump();
+    expect(loads, 2);
+    expect(data.x(data.length - 1), 200);
+    c.x.jumpTo(180, 230);
+    await tester.pump();
+    await tester.pump();
+    expect(loads, 2, reason: 'nothing more to load on this side');
+  });
 }
