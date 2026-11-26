@@ -294,8 +294,13 @@ class ChartScaleController extends ChangeNotifier implements ChartRangeContext {
   (double, double) _clamp(double lo, double hi) {
     final ChartLimits limits = _scale.limits;
     final (double? dataMin, double? dataMax) = limits.bounds(this);
-    final double? boundLo = dataMin == null ? null : _scale.transform(dataMin);
-    final double? boundHi = dataMax == null ? null : _scale.transform(dataMax);
+    double? boundLo = dataMin == null ? null : _scale.transform(dataMin);
+    double? boundHi = dataMax == null ? null : _scale.transform(dataMax);
+    // Bounds the wrong way round cannot be met: ignore them.
+    if (boundLo != null && boundHi != null && boundHi < boundLo) {
+      boundLo = null;
+      boundHi = null;
+    }
 
     double span = hi - lo;
     final double center = (lo + hi) / 2;

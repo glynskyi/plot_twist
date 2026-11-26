@@ -220,6 +220,8 @@ class LogTicks extends ChartTicks {
   @override
   List<ChartTick> generate(ChartTickContext context) {
     if (!(context.min > 0) || !(context.max > context.min)) return const <ChartTick>[];
+    // There are no powers of such a base to put ticks at.
+    if (!(base > 0) || base == 1) return const <ChartTick>[];
     final int target = context.targetCount(spacing);
     final double logBase = math.log(base);
     final int lo = (math.log(context.min) / logBase).floor();

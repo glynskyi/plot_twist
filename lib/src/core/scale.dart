@@ -188,8 +188,9 @@ class FitBandsRange extends ChartRangePolicy {
 
 /// Always shows `[min, max]`.
 class FixedRange extends ChartRangePolicy {
-  /// Creates a fixed window.
-  const FixedRange(this.min, this.max);
+  /// Creates a fixed window. [max] must not be smaller than [min].
+  const FixedRange(this.min, this.max)
+    : assert(max >= min, 'FixedRange: max must not be smaller than min');
 
   /// Lower bound of the window.
   final double min;
@@ -198,7 +199,14 @@ class FixedRange extends ChartRangePolicy {
   final double max;
 
   @override
-  ChartRange resolve(ChartRangeContext context) => ChartRange(min, max);
+  ChartRange resolve(ChartRangeContext context) {
+    if (max > min) return ChartRange(min, max);
+    if (max < min) return ChartRange(max, min);
+    // One value, as in `FixedRange(first, last)` over a single row: show it
+    // with some room around it.
+    final double room = min == 0 ? 0.5 : min.abs() * 0.05;
+    return ChartRange(min - room, max + room);
+  }
 
   @override
   bool operator ==(Object other) => other is FixedRange && other.min == min && other.max == max;
@@ -210,7 +218,9 @@ class FixedRange extends ChartRangePolicy {
 /// Shows the most recent [span] units of data.
 class FollowRange extends ChartRangePolicy {
   /// Creates a follow policy. [lead] leaves empty room after the newest value.
-  const FollowRange({required this.span, this.lead = 0});
+  /// [span] must be positive.
+  const FollowRange({required this.span, this.lead = 0})
+    : assert(span > 0, 'FollowRange: span must be positive');
 
   /// Width of the window, in data units.
   final double span;
@@ -237,20 +247,42 @@ class FollowRange extends ChartRangePolicy {
 /// Subclass and override [bounds] for limits that depend on app state (for
 /// example the part of a domain a loader is allowed to reach).
 class ChartLimits {
-  /// Explicit limits in data units. Null sides are unbounded.
-  const ChartLimits({this.min, this.max, this.minSpan, this.maxSpan}) : dataPadding = null;
+  /// Explicit limits. Null sides are unbounded.
+  ///
+  /// [min] and [max] are data values. [minSpan] and [maxSpan] are widths in
+  /// scale space: the same as data units on a linear, time or band scale, and
+  /// powers of the base (decades) on a logarithmic one.
+  const ChartLimits({this.min, this.max, this.minSpan, this.maxSpan})
+    : assert(
+        min == null || max == null || max >= min,
+        'ChartLimits: max must not be smaller than min',
+      ),
+      assert(minSpan == null || minSpan >= 0, 'ChartLimits: minSpan must not be negative'),
+      assert(maxSpan == null || maxSpan > 0, 'ChartLimits: maxSpan must be positive'),
+      assert(
+        minSpan == null || maxSpan == null || maxSpan >= minSpan,
+        'ChartLimits: maxSpan must not be smaller than minSpan',
+      ),
+      dataPadding = null;
 
   /// The window may not leave the data extent, grown by [padding] (a fraction
   /// of the extent) on both sides.
   const ChartLimits.data({double padding = 0, this.minSpan, this.maxSpan})
-    : dataPadding = padding,
+    : assert(padding >= 0, 'ChartLimits.data: padding must not be negative'),
+      assert(minSpan == null || minSpan >= 0, 'ChartLimits.data: minSpan must not be negative'),
+      assert(maxSpan == null || maxSpan > 0, 'ChartLimits.data: maxSpan must be positive'),
+      assert(
+        minSpan == null || maxSpan == null || maxSpan >= minSpan,
+        'ChartLimits.data: maxSpan must not be smaller than minSpan',
+      ),
+      dataPadding = padding,
       min = null,
       max = null;
 
-  /// Lower bound of the pannable domain.
+  /// Lower bound of the pannable domain, in data units.
   final double? min;
 
-  /// Upper bound of the pannable domain.
+  /// Upper bound of the pannable domain, in data units.
   final double? max;
 
   /// When non-null, bounds follow the data extent with this padding fraction.
@@ -365,8 +397,19 @@ abstract class ChartScale {
   /// The tick strategy used when [ticks] is null.
   ChartTicks get defaultTicks;
 
-  /// [ticks] or, if null, [defaultTicks].
-  ChartTicks get effectiveTicks => ticks ?? defaultTicks;
+  /// [ticks], completed by [resolveTicks], or [defaultTicks] if null.
+  ChartTicks get effectiveTicks {
+    final ChartTicks? own = ticks;
+    return own == null ? defaultTicks : resolveTicks(own);
+  }
+
+  /// Completes [ticks] that were written without what this scale knows.
+  ///
+  /// Ticks are often given only to change a spacing or a format, as in
+  /// `TimeScale(utc: true, ticks: TimeTicks(spacing: 120))`. A time scale in
+  /// UTC then makes them UTC ticks, a logarithmic scale gives them its base,
+  /// and a band scale its labels. The default returns [ticks] unchanged.
+  ChartTicks resolveTicks(ChartTicks ticks) => ticks;
 
   /// The values this scale can show, or null when it can show every value.
   ///
@@ -413,8 +456,9 @@ class LinearScale extends ChartScale {
 /// treated as missing data (see [domain]), so a bar series with its default
 /// baseline of 0 grows from the edge of the plot.
 class LogScale extends ChartScale {
-  /// Creates a logarithmic scale.
-  const LogScale({this.base = 10, super.range, super.limits, super.ticks, super.reversed});
+  /// Creates a logarithmic scale. [base] must be positive and not 1.
+  const LogScale({this.base = 10, super.range, super.limits, super.ticks, super.reversed})
+    : assert(base > 0 && base != 1, 'LogScale: base must be positive and not 1');
 
   /// The logarithm base.
   final double base;
@@ -431,6 +475,12 @@ class LogScale extends ChartScale {
 
   @override
   ChartTicks get defaultTicks => LogTicks(base: base);
+
+  // Ticks written without a base (it defaults to 10) get this scale's.
+  @override
+  ChartTicks resolveTicks(ChartTicks ticks) => ticks is LogTicks && ticks.base == 10 && base != 10
+      ? LogTicks(base: base, spacing: ticks.spacing, format: ticks.format)
+      : ticks;
 
   @override
   bool operator ==(Object other) => super == other && other is LogScale && other.base == base;
@@ -463,6 +513,12 @@ class TimeScale extends ChartScale {
   @override
   ChartTicks get defaultTicks => TimeTicks(utc: utc);
 
+  // On a UTC scale, time ticks are UTC ticks.
+  @override
+  ChartTicks resolveTicks(ChartTicks ticks) => ticks is TimeTicks && utc && !ticks.utc
+      ? TimeTicks(spacing: ticks.spacing, utc: true, format: ticks.format)
+      : ticks;
+
   @override
   bool operator ==(Object other) => super == other && other is TimeScale && other.utc == utc;
 
@@ -493,6 +549,13 @@ class BandScale extends ChartScale {
 
   @override
   ChartTicks get defaultTicks => BandTicks(labels: labels);
+
+  // Band ticks without labels get this scale's.
+  @override
+  ChartTicks resolveTicks(ChartTicks ticks) =>
+      ticks is BandTicks && ticks.labels == null && labels != null
+      ? BandTicks(labels: labels, spacing: ticks.spacing, format: ticks.format)
+      : ticks;
 
   @override
   bool operator ==(Object other) =>

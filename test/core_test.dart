@@ -15,6 +15,16 @@ List<double> _values(ChartTicks ticks, double min, double max, {double extent = 
     .map((ChartTick t) => t.value)
     .toList();
 
+// Logarithmic ticks whose base is not checked by a constructor.
+class _UncheckedLogTicks extends LogTicks {
+  const _UncheckedLogTicks(this._base);
+
+  final double _base;
+
+  @override
+  double get base => _base;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -186,6 +196,98 @@ void main() {
         }
       }
     }, skip: noDaylightSaving);
+  });
+
+  group('scale configuration', () {
+    test('ticks set on a scale inherit what the scale knows', () {
+      // UTC, when the scale is in UTC.
+      const TimeScale time = TimeScale(utc: true, ticks: TimeTicks(spacing: 120));
+      final TimeTicks timeTicks = time.effectiveTicks as TimeTicks;
+      expect(timeTicks.utc, isTrue);
+      expect(timeTicks.spacing, 120);
+      expect(
+        (const TimeScale(ticks: TimeTicks(utc: true)).effectiveTicks as TimeTicks).utc,
+        isTrue,
+      );
+      expect((const TimeScale(ticks: TimeTicks()).effectiveTicks as TimeTicks).utc, isFalse);
+      final double midnight = DateTime.utc(2026, 3, 1).millisecondsSinceEpoch.toDouble();
+      for (final double value in _values(time.effectiveTicks, midnight, midnight + 4 * 86400e3)) {
+        final DateTime t = DateTime.fromMillisecondsSinceEpoch(value.round(), isUtc: true);
+        expect((t.hour, t.minute), (0, 0), reason: '$t');
+      }
+
+      // The base of a logarithmic scale.
+      const LogScale binary = LogScale(base: 2, ticks: LogTicks(spacing: 50));
+      final LogTicks logTicks = binary.effectiveTicks as LogTicks;
+      expect(logTicks.base, 2);
+      expect(logTicks.spacing, 50);
+      expect(_values(binary.effectiveTicks, 1, 64), <double>[1, 2, 4, 8, 16, 32, 64]);
+      // Ticks with a base of their own keep it.
+      expect((const LogScale(ticks: LogTicks(base: 2)).effectiveTicks as LogTicks).base, 2);
+
+      // The labels of a band scale.
+      const BandScale bands = BandScale(labels: <String>['a', 'b', 'c'], ticks: BandTicks());
+      expect(
+        bands.effectiveTicks
+            .generate(
+              const ChartTickContext(min: -0.5, max: 2.5, extent: 400, direction: Axis.horizontal),
+            )
+            .map((ChartTick t) => t.label),
+        <String>['a', 'b', 'c'],
+      );
+      const BandScale named = BandScale(
+        labels: <String>['a', 'b'],
+        ticks: BandTicks(labels: <String>['x', 'y']),
+      );
+      expect((named.effectiveTicks as BandTicks).labels, <String>['x', 'y']);
+
+      // Ticks of another kind, and scales without ticks, are left alone.
+      const ChartTicks fixed = FixedTicks(<double>[1, 2]);
+      expect(const TimeScale(utc: true, ticks: fixed).effectiveTicks, same(fixed));
+      expect(const TimeScale(utc: true).effectiveTicks, const TimeTicks(utc: true));
+    });
+
+    test('configuration that cannot work is caught when it is written', () {
+      // Read at run time, so that the constructors run instead of the
+      // compiler rejecting the constants.
+      final double zero = double.parse('0');
+      expect(() => FixedRange(zero + 10, zero), throwsAssertionError);
+      expect(() => FollowRange(span: zero), throwsAssertionError);
+      expect(() => FollowRange(span: zero - 5), throwsAssertionError);
+      expect(() => LogScale(base: zero + 1), throwsAssertionError);
+      expect(() => LogScale(base: zero), throwsAssertionError);
+      expect(() => ChartLimits(min: zero + 10, max: zero), throwsAssertionError);
+      expect(() => ChartLimits(minSpan: zero + 10, maxSpan: zero + 5), throwsAssertionError);
+      expect(() => ChartLimits(minSpan: zero - 1), throwsAssertionError);
+      // What is allowed.
+      expect(FixedRange(zero + 5, zero + 5).min, 5);
+      expect(LogScale(base: zero + 2).base, 2);
+      expect(ChartLimits(min: zero, max: zero + 10, minSpan: zero + 1, maxSpan: zero + 5).max, 10);
+    });
+
+    test('a window of one value is shown with room around it', () {
+      final ChartScaleController controller = ChartScaleController();
+      addTearDown(controller.dispose);
+      controller.configure(const LinearScale(range: FixedRange(5, 5)));
+      expect(controller.min, lessThan(5));
+      expect(controller.max, greaterThan(5));
+      expect(controller.range.center, 5);
+    });
+
+    test('logarithmic ticks with a base that is no base produce no ticks', () {
+      const ChartTickContext context = ChartTickContext(
+        min: 1,
+        max: 1000,
+        extent: 400,
+        direction: Axis.horizontal,
+      );
+      final double one = double.parse('1');
+      for (final double base in <double>[one, 0, -2, double.nan]) {
+        // Built without the scale's check, as a release build would.
+        final List<ChartTick> ticks = _UncheckedLogTicks(base).generate(context);
+        expect(ticks, isEmpty, reason: 'base $base');
+      }
+    });
   });
 
   group('scale controller', () {

@@ -111,10 +111,13 @@ class ChartAxis extends StatelessWidget {
         if (!view.scales.containsKey(scaleId)) return ChartTickSet.empty;
         final ChartScaleView s = view.scale(scaleId);
         if (override == null) return ChartTickSet(s.ticks);
+        // The scale completes them: UTC, a logarithm base, band labels.
         return ChartTickSet(
-          override.generate(
-            ChartTickContext(min: s.min, max: s.max, extent: s.extent, direction: s.direction),
-          ),
+          s.scale
+              .resolveTicks(override)
+              .generate(
+                ChartTickContext(min: s.min, max: s.max, extent: s.extent, direction: s.direction),
+              ),
         );
       },
       builder: (BuildContext context, ChartTickSet tickSet) {

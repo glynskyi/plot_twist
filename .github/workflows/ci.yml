@@ -42,7 +42,7 @@ jobs:
       # The runner's clock is UTC, where the tests of local-time ticks across a
       # clock change skip themselves.
       - name: Time ticks in a zone with daylight saving time
-        run: TZ=America/New_York flutter test test/core_test.dart
+        run: TZ=America/New_York flutter test test/core_test.dart test/axis_test.dart
       - name: Gallery (every demo runs, stays under 120 lines and uses only the public API)
         working-directory: example
         run: flutter test

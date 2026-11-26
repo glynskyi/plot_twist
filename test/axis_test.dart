@@ -250,4 +250,30 @@ void main() {
     expect(controller.x.max, moreOrLessEquals(80, epsilon: 1e-9));
     expect(markerCenter(tester).dx, moreOrLessEquals(220, epsilon: 1e-6));
   });
+
+  testWidgets('ticks given to an axis follow the scale: UTC on a UTC time scale', (
+    WidgetTester tester,
+  ) async {
+    final ChartController controller = ChartController();
+    addTearDown(controller.dispose);
+    final double start = DateTime.utc(2026, 3, 10).millisecondsSinceEpoch.toDouble();
+    await tester.pumpWidget(
+      host(
+        Chart(
+          controller: controller,
+          x: TimeScale(utc: true, range: FixedRange(start, start + 86400e3)),
+          bottom: const <Widget>[ChartAxis(ticks: TimeTicks(spacing: 100))],
+        ),
+        size: const Size(800, 300),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+    final ChartView view = controller.view!;
+    // 06:00 on the scale's clock, wherever the tests run.
+    final double six = DateTime.utc(2026, 3, 10, 6).millisecondsSinceEpoch.toDouble();
+    expect(
+      tester.getCenter(find.text('06:00')).dx,
+      moreOrLessEquals(view.x.toPixel(six), epsilon: 0.5),
+    );
+  });
 }
