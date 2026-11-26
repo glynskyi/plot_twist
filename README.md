@@ -28,6 +28,8 @@ instead of forking the library.
   and candlestick charts. Stacked bars and stacked areas; candles that are
   filled, hollow or OHLC bars. Data labels, a legend, reference lines and an
   appear animation are layers you add.
+- Pie and doughnut charts, gauges and radar charts on a `PolarChart`, with
+  the same legend, tooltip, data labels and animations.
 - Linear, log, time and band scales, or your own transform. A time scale
   draws a time series with ticks that follow the calendar.
 - Large datasets: a million-point line pans and zooms without a missed frame
@@ -38,8 +40,8 @@ instead of forking the library.
 - No dependencies beyond Flutter's widgets layer. The package does not
   import Material or Cupertino.
 
-The API is 0.x and can still change. 0.2.0 renamed a few parameters; the old
-names keep working until 0.3.0 (see the
+The API is 0.x and can still change. 0.3.0 removed the parameter names that
+0.2.0 had replaced (see the
 [changelog](https://github.com/glynskyi/plot_twist/blob/main/CHANGELOG.md)).
 To hear about new versions, watch the repository's releases on GitHub
 (Watch → Custom → Releases).
@@ -48,7 +50,7 @@ To hear about new versions, watch the repository's releases on GitHub
 
 ```yaml
 dependencies:
-  plot_twist: ^0.2.0
+  plot_twist: ^0.3.0
 ```
 
 ```dart
@@ -274,6 +276,72 @@ Chart(
 - `ChartReferenceLine.y(value)` draws a threshold or a target, with an
   optional label.
 
+## Pie, gauge and radar
+
+A `PolarChart` is a chart on a circle: its angle scale runs around the centre
+and its radius scale from the centre outwards. The rest is as above. The
+children are layers, and the legend, the tooltip, the data labels and the
+animations are the same widgets.
+
+```dart
+// A doughnut with a total in its hole.
+PolarChart(
+  innerRadius: 0.6,
+  bottom: const <Widget>[ChartLegend()],
+  children: <Widget>[
+    PieSeries(data: spending, labels: const <String>['Rent', 'Food', 'Fun'], gap: 2),
+    const ChartDataLabels(position: ChartDataLabelPosition.center),
+    const Center(child: Text('2,150')),
+    const ChartCrosshair.point(), // follows the slice under the pointer
+    const ChartTooltip(),
+  ],
+)
+
+// A gauge: 72 of 100 on three quarters of a circle.
+PolarChart(
+  angle: const LinearScale(range: FixedRange(0, 100)),
+  startAngle: 0.75 * math.pi,
+  sweepAngle: 1.5 * math.pi,
+  innerRadius: 0.8,
+  children: <Widget>[
+    RadialBarSeries(data: load, track: true, cap: StrokeCap.round),
+    const ChartPolarAxis.angle(inside: true),
+  ],
+)
+
+// A radar chart: the categories around, the values outwards.
+PolarChart(
+  angle: const ChartScale.band(labels: <String>['Speed', 'Range', 'Comfort', 'Price']),
+  radius: const LinearScale(range: FixedRange(0, 10)),
+  margin: const EdgeInsets.all(28), // room for the labels
+  children: <Widget>[
+    const ChartPolarGrid(shape: ChartPolarGridShape.polygon),
+    const ChartPolarAxis.angle(),
+    RadarSeries(data: modelA, label: 'Model A'),
+    RadarSeries(data: modelB, label: 'Model B'),
+  ],
+)
+```
+
+- Angles are in radians and follow `Canvas.drawArc`: zero points to three
+  o'clock and positive angles turn clockwise. A chart starts at twelve
+  o'clock unless `startAngle` says otherwise.
+- The slices of a `PieSeries` fill the whole sweep. On an angle scale with a
+  fixed range they fill their share of it. `innerRadius` is the hole of a
+  doughnut, `offsetOf` pulls a slice out, and with `labels` the legend shows
+  one item per slice.
+- A `RadialBarSeries` draws one ring per row. Give each ring a series of its
+  own to get rings in different colours with a legend.
+- A chart that turns less than a whole circle is laid out so that the part
+  that is drawn fills the plot: a half-circle gauge is as wide as its plot.
+- `ChartNeedle(value: …)` is the pointer of a gauge, and
+  `ChartPolarPositioned` places any widget by an angle and a radius.
+- `ChartAppear` with `ChartAppearEffect.reveal` draws a pie in around its
+  centre. `AnimatedChartData` moves slices, bars and corners to new values.
+- The three series are painters on the public contract, like the Cartesian
+  ones. In a painter of your own, `ChartPolar.resolve(view)` gives the
+  centre, the radius and the pixel of every value.
+
 ## Candlesticks
 
 `CandlestickSeries` reads four value columns of a `ChartData`: the open, high,
@@ -385,7 +453,7 @@ and a test fails if any demo goes over 120 lines.
 | A5 | Infinite history | 86 | A18 | Accessibility | 95 |
 | A6 | Lazy widget markers | 82 | A19 | Animated transitions | 78 |
 | A7 | Widgets as axis labels | 82 | A20 | Legend outside the chart | 68 |
-| A8 | Custom series | 99 | A21 | Non-Cartesian content | 119 |
+| A8 | Custom series | 99 | A21 | Pie, gauge and radar | 113 |
 | A9 | Gestures that coexist | 113 | A22 | Data-driven styling | 86 |
 | A10 | One million points | 66 | A23 | Navigator by composition | 90 |
 | A11 | Mixed series, two Y axes | 87 | A24 | Many small charts | 65 |
@@ -402,8 +470,8 @@ problems app developers report, and shows how each one is met.
 
 ## Not included yet
 
-- First-class polar coordinates. The donut in A21 is a custom painter, and a
-  radar chart is not part of the gallery.
+- In a polar chart: pan and zoom, bars that stand around the circle (a rose
+  chart), and leader lines from a pie to labels outside it.
 - A Material theme adapter and a `Scrollbar` adapter.
 - Financial indicators such as moving averages and bands. Compute them in the
   app and draw the result with the built-in series.

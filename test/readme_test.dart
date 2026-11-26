@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
@@ -366,6 +367,138 @@ void main() {
     expect(data.firstOrdinal, 99);
   });
 
+  testWidgets('pie, gauge and radar', (WidgetTester tester) async {
+    final ChartData spending = ChartData.fromValues(<double>[1200, 640, 310]);
+    final ChartData load = ChartData.fromValues(<double>[72]);
+    final ChartData modelA = ChartData.fromValues(<double>[8, 6, 7, 4]);
+    final ChartData modelB = ChartData.fromValues(<double>[5, 9, 6, 8]);
+    final ChartController pie = ChartController();
+    final ChartController gauge = ChartController();
+    final ChartController radar = ChartController();
+    addTearDown(pie.dispose);
+    addTearDown(gauge.dispose);
+    addTearDown(radar.dispose);
+    // The samples, each with a controller to look at it by.
+    Widget controlled(PolarChart chart, ChartController controller) => Expanded(
+      child: PolarChart(
+        controller: controller,
+        angle: chart.angle,
+        radius: chart.radius,
+        startAngle: chart.startAngle,
+        sweepAngle: chart.sweepAngle,
+        innerRadius: chart.innerRadius,
+        margin: chart.margin,
+        bottom: chart.bottom,
+        children: chart.children,
+      ),
+    );
+
+    await tester.pumpWidget(
+      host(
+        size: const Size(900, 320),
+        Row(
+          children: <Widget>[
+            controlled(
+              // A doughnut with a total in its hole.
+              PolarChart(
+                innerRadius: 0.6,
+                bottom: const <Widget>[ChartLegend()],
+                children: <Widget>[
+                  PieSeries(data: spending, labels: const <String>['Rent', 'Food', 'Fun'], gap: 2),
+                  const ChartDataLabels(position: ChartDataLabelPosition.center),
+                  const Center(child: Text('2,150')),
+                  const ChartCrosshair.point(), // follows the slice under the pointer
+                  const ChartTooltip(),
+                ],
+              ),
+              pie,
+            ),
+            controlled(
+              // A gauge: 72 of 100 on three quarters of a circle.
+              PolarChart(
+                angle: const LinearScale(range: FixedRange(0, 100)),
+                startAngle: 0.75 * math.pi,
+                sweepAngle: 1.5 * math.pi,
+                innerRadius: 0.8,
+                children: <Widget>[
+                  RadialBarSeries(data: load, track: true, cap: StrokeCap.round),
+                  const ChartPolarAxis.angle(inside: true),
+                ],
+              ),
+              gauge,
+            ),
+            controlled(
+              // A radar chart: the categories around, the values outwards.
+              PolarChart(
+                angle: const ChartScale.band(
+                  labels: <String>['Speed', 'Range', 'Comfort', 'Price'],
+                ),
+                radius: const LinearScale(range: FixedRange(0, 10)),
+                margin: const EdgeInsets.all(28), // room for the labels
+                children: <Widget>[
+                  const ChartPolarGrid(shape: ChartPolarGridShape.polygon),
+                  const ChartPolarAxis.angle(),
+                  RadarSeries(data: modelA, label: 'Model A'),
+                  RadarSeries(data: modelB, label: 'Model B'),
+                ],
+              ),
+              radar,
+            ),
+          ],
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+
+    // The doughnut: a legend item per slice on the first frame, three slices
+    // that fill the circle, and the widget in the hole.
+    expect(find.text('Rent'), findsOneWidget);
+    expect(find.text('Food'), findsOneWidget);
+    expect(find.text('Fun'), findsOneWidget);
+    expect(find.text('2,150'), findsOneWidget);
+    expect(pie.view!.scale(kChartAngle).range, const ChartRange(0, 2150));
+    final List<ChartHit> slices = <ChartHit>[];
+    pie.series.single.visitMarks(pie.view!, (ChartHit mark) {
+      slices.add(mark);
+      return true;
+    });
+    expect(slices.map((ChartHit mark) => mark.label), <String>['Rent', 'Food', 'Fun']);
+    expect(
+      slices.fold<double>(0, (double sum, ChartHit mark) => sum + mark.sector!.sweepAngle),
+      closeTo(2 * math.pi, 1e-9),
+    );
+    expect(slices.first.sector!.innerRadius, closeTo(slices.first.sector!.outerRadius * 0.6, 1e-9));
+    // Pointing at the first slice names it.
+    final TestPointer mouse = TestPointer(1, PointerDeviceKind.mouse);
+    final Offset piePlot = tester.getTopLeft(
+      find.ancestor(of: find.byType(PieSeries), matching: find.byType(ChartStack)),
+    );
+    await tester.sendEventToBinding(mouse.hover(piePlot + slices.first.position));
+    await tester.pump();
+    expect(find.text('Rent: '), findsOneWidget);
+    expect(find.text('1200'), findsWidgets);
+
+    // The gauge: 72 hundredths of three quarters of a circle, from the lower left.
+    final List<ChartHit> bars = <ChartHit>[];
+    gauge.series.single.visitMarks(gauge.view!, (ChartHit mark) {
+      bars.add(mark);
+      return true;
+    });
+    expect(bars.single.value, 72);
+    expect(bars.single.sector!.startAngle, closeTo(0.75 * math.pi, 1e-9));
+    expect(bars.single.sector!.sweepAngle, closeTo(0.72 * 1.5 * math.pi, 1e-9));
+
+    // The radar: two series in two colours, hit at the same category.
+    expect(radar.series.map((ChartSeries series) => series.label), <String>['Model A', 'Model B']);
+    expect(radar.series[1].color, ChartThemeData.defaultPalette[1]);
+    final ChartView view = radar.view!;
+    final List<ChartHit> range = radar.hitTest(
+      Offset(view.size.width / 2 + 40, view.size.height / 2),
+      mode: ChartHitMode.nearest,
+    );
+    expect(range.map((ChartHit hit) => hit.value).toSet(), <double>{6, 9});
+  });
+
   test('the README shows the code that is tested here', () {
     // Ignores layout: white space, and the commas the formatter adds and removes.
     String normalise(String s) =>
@@ -375,7 +508,7 @@ void main() {
       r'```dart\n(.*?)```',
       dotAll: true,
     ).allMatches(File('README.md').readAsStringSync());
-    expect(samples.length, 7);
+    expect(samples.length, 8);
     final List<String> untested = <String>[
       for (final RegExpMatch sample in samples)
         for (final String line in sample[1]!.split('\n'))
