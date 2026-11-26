@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:plot_twist/plot_twist.dart';
 import 'package:plot_twist_example/demos/a18_accessibility.dart';
+import 'package:plot_twist_example/demos/a19_transitions.dart';
 import 'package:plot_twist_example/demos/a26_candlesticks.dart';
 import 'package:plot_twist_example/main.dart';
 import 'package:plot_twist_example/shared/fake.dart';
@@ -138,6 +139,79 @@ void main() {
     await tester.pump();
     expect(chart.focus.value?.x, 1);
     semantics.dispose();
+  });
+
+  testWidgets('A19: the button lays the bars down, and every bar keeps its label', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(2000, 1400);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    final GlobalKey shot = GlobalKey();
+    await tester.pumpWidget(
+      RepaintBoundary(
+        key: shot,
+        child: MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(colorSchemeSeed: const Color(0xFF3F6FB5), fontFamily: 'Roboto'),
+          home: const Scaffold(
+            body: Padding(padding: EdgeInsets.all(16), child: TransitionsDemo()),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(seconds: 1));
+    final ChartController chart = ChartScope.of(tester.element(find.byType(ChartGrid))).controller;
+    int labels() {
+      final TestRecordingCanvas canvas = TestRecordingCanvas();
+      tester
+          .renderObject(
+            find.descendant(of: find.byType(ChartDataLabels), matching: find.byType(ChartPaint)),
+          )
+          .paint(TestRecordingPaintingContext(canvas), Offset.zero);
+      return canvas.invocations
+          .where((RecordedInvocation i) => i.invocation.memberName == #drawParagraph)
+          .length;
+    }
+
+    // Seven columns: the bands run along x and the values up.
+    expect(chart.x.range, const ChartRange(-0.5, 6.5));
+    expect(chart.hitsAt(2).single.valueAxis, Axis.vertical);
+    expect(labels(), 7);
+
+    await tester.tap(find.byIcon(Icons.rotate_90_degrees_cw));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(tester.takeException(), isNull);
+    // The same data, lying: the bands run down y, and the values start at zero on x.
+    expect(chart.y.range, const ChartRange(-0.5, 6.5));
+    expect(chart.x.range.min, 0);
+    final ChartView view = chart.view!;
+    expect(view.y.toPixel(0), lessThan(view.y.toPixel(6)), reason: 'the first bar is on top');
+    final ChartHit bar = chart
+        .hitTest(Offset(10, view.y.toPixel(2)), mode: ChartHitMode.nearestY)
+        .single;
+    expect(bar.valueAxis, Axis.horizontal);
+    expect(bar.index, 2);
+    expect(bar.rect!.left, moreOrLessEquals(view.x.toPixel(0), epsilon: 0.01));
+    expect(labels(), 7);
+
+    // The transition between periods works lying down too.
+    await tester.tap(find.text('Year'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(tester.takeException(), isNull);
+    await tester.pump(const Duration(seconds: 1));
+    expect(chart.y.range, const ChartRange(-0.5, 11.5));
+    expect(labels(), 12);
+
+    final RenderRepaintBoundary boundary = tester.renderObject(find.byKey(shot));
+    await tester.runAsync(() async {
+      final ui.Image image = await boundary.toImage(pixelRatio: 2);
+      final ByteData? png = await image.toByteData(format: ui.ImageByteFormat.png);
+      File('${screenshots.path}/a19_lying.png').writeAsBytesSync(png!.buffer.asUint8List());
+      image.dispose();
+    });
   });
 
   testWidgets('A26: the window follows the trading candle; zoomed out, a pixel column is one', (

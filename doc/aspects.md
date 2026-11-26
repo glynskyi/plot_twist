@@ -744,8 +744,8 @@ quoted under A10.
 - **Automated.** `example/test/demos_test.dart` runs every demo with a real
   font: it builds it, hovers, drags, scrolls the wheel, disposes it, and fails
   on any exception. It also writes a screenshot of each demo to
-  `example/build/screenshots/`. A18 and A26 have a test of their own for what
-  their descriptions claim.
+  `example/build/screenshots/`. A18, A19 and A26 have a test of their own for
+  what their descriptions claim.
 - **By hand.** Every demo was driven in Chrome on the web build: each
   behavior its description names was tried and seen to work.
 - **Package tests.** The mechanisms behind the demos have their own tests in
