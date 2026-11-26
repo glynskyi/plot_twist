@@ -364,6 +364,36 @@ void main() {
     expect(c.x.min, moreOrLessEquals(20, epsilon: 1e-9));
   });
 
+  testWidgets('removing ChartPanZoom in the middle of a drag releases its scales', (
+    WidgetTester tester,
+  ) async {
+    final ChartController c = ChartController();
+    addTearDown(c.dispose);
+    Widget chart({required bool panZoom}) => host(
+      Chart(
+        controller: c,
+        x: _x,
+        y: _y,
+        children: <Widget>[if (panZoom) const ChartPanZoom(panY: true)],
+      ),
+    );
+    await tester.pumpWidget(chart(panZoom: true));
+    final TestGesture gesture = await tester.startGesture(const Offset(200, 150));
+    await gesture.moveBy(const Offset(-20, 0));
+    await gesture.moveBy(const Offset(-40, 0));
+    await tester.pump();
+    expect(c.x.isInteracting, isTrue);
+    expect(c.y.isInteracting, isTrue);
+
+    // For example, a setting that turns panning off while a finger is down.
+    await tester.pumpWidget(chart(panZoom: false));
+    expect(c.x.isInteracting, isFalse);
+    expect(c.y.isInteracting, isFalse);
+    await gesture.up();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('a chart without behaviors is transparent to pointers', (WidgetTester tester) async {
     int taps = 0;
     await tester.pumpWidget(

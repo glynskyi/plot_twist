@@ -459,4 +459,184 @@ void main() {
     await tester.pump();
     expect(loads, 2, reason: 'nothing more to load on this side');
   });
+
+  testWidgets('a failed load is reported once and tried again when the window moves', (
+    WidgetTester tester,
+  ) async {
+    final ChartController c = ChartController();
+    addTearDown(c.dispose);
+    final ChartData data = ChartData.generate(101, (int i) => (100.0 + i, i.toDouble()));
+    final List<Object> errors = <Object>[];
+    final List<bool> loading = <bool>[];
+    int calls = 0;
+    Widget chart({required bool report}) => host(
+      Chart(
+        controller: c,
+        x: const LinearScale(range: FixedRange(110, 160)),
+        y: _y,
+        children: <Widget>[
+          LineSeries(data: data),
+          ChartLoader(
+            data: data,
+            onLoadingChanged: loading.add,
+            onError: report ? (Object error, StackTrace stack) => errors.add(error) : null,
+            onLoadBefore: () async {
+              calls++;
+              if (calls == 1 || calls == 3) throw StateError('offline');
+              final double first = data.x(0);
+              data.prependAll(<double>[first - 2, first - 1], <double>[1, 1]);
+              return false;
+            },
+          ),
+        ],
+      ),
+    );
+    await tester.pumpWidget(chart(report: true));
+    await tester.pump();
+    await tester.pump();
+    expect(calls, 1);
+    expect(errors.single, isStateError);
+    expect(loading, <bool>[true, false], reason: 'the failed load is over');
+    // Not asked again while nothing changes.
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+    expect(calls, 1);
+
+    // The user keeps panning: the loader tries again, and this time it works.
+    c.x.jumpTo(105, 155);
+    await tester.pump();
+    await tester.pump();
+    expect(calls, 2);
+    expect(data.x(0), 98);
+    expect(errors, hasLength(1));
+    expect(tester.takeException(), isNull);
+
+    // Without onError the failure is reported the way Flutter reports errors.
+    data.replaceAll(<double>[100, 101], <double>[1, 2]);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(chart(report: false));
+    await tester.pump();
+    await tester.pump();
+    expect(calls, 3);
+    expect(tester.takeException(), isStateError);
+  });
+
+  testWidgets('a load that says there is more but adds nothing is not repeated at once', (
+    WidgetTester tester,
+  ) async {
+    final ChartController c = ChartController();
+    addTearDown(c.dispose);
+    final ChartData data = ChartData.generate(101, (int i) => (100.0 + i, i.toDouble()));
+    int calls = 0;
+    await tester.pumpWidget(
+      host(
+        Chart(
+          controller: c,
+          x: const LinearScale(range: FixedRange(110, 160)),
+          y: _y,
+          children: <Widget>[
+            LineSeries(data: data),
+            ChartLoader(
+              data: data,
+              onLoadBefore: () async {
+                calls++;
+                return true;
+              },
+              onLoadAfter: () {
+                throw StateError('not even a future');
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+    for (int i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(calls, 1);
+    expect(tester.takeException(), isNull, reason: 'the newer side is not near');
+    c.x.jumpTo(108, 158);
+    for (int i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(calls, 2);
+
+    // A callback that throws instead of returning a future is a failed load.
+    c.x.jumpTo(170, 220);
+    await tester.pump();
+    await tester.pump();
+    expect(tester.takeException(), isStateError);
+    await tester.pump();
+    expect(tester.takeException(), isNull, reason: 'reported once');
+  });
+
+  testWidgets('the loader follows a change of its scale', (WidgetTester tester) async {
+    final ChartController c = ChartController();
+    addTearDown(c.dispose);
+    final ChartData data = ChartData.generate(101, (int i) => (100.0 + i, i.toDouble()));
+    int calls = 0;
+    Widget chart(Object xScale) => host(
+      Chart(
+        controller: c,
+        x: const LinearScale(range: FixedRange(140, 160)),
+        xScales: const <Object, ChartScale>{'history': LinearScale(range: FixedRange(100, 120))},
+        y: _y,
+        children: <Widget>[
+          LineSeries(data: data),
+          ChartLoader(
+            data: data,
+            xScale: xScale,
+            onLoadBefore: () async {
+              calls++;
+              return false;
+            },
+          ),
+        ],
+      ),
+    );
+    await tester.pumpWidget(chart(kChartX));
+    await tester.pump();
+    expect(calls, 0, reason: 'the default scale shows the middle of the data');
+    await tester.pumpWidget(chart('history'));
+    await tester.pump();
+    await tester.pump();
+    expect(calls, 1, reason: 'this scale shows the first loaded value');
+  });
+
+  testWidgets('with reduced motion, animated data is in place on the first frame', (
+    WidgetTester tester,
+  ) async {
+    final ChartController c = ChartController();
+    addTearDown(c.dispose);
+    final ChartData data = ChartData.fromValues(<double>[10, 20, 30]);
+    Widget chart({required bool reduceMotion}) => MediaQuery(
+      data: MediaQueryData(disableAnimations: reduceMotion),
+      child: host(
+        Chart(
+          controller: c,
+          children: <Widget>[
+            AnimatedChartData(
+              data: data,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.linear,
+              builder: (BuildContext context, ChartData animated) =>
+                  BarSeries(data: animated, id: 'bars'),
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpWidget(chart(reduceMotion: true));
+    expect(c.seriesById('bars')!.valueAt(2), 30);
+    expect(tester.hasRunningAnimations, isFalse);
+
+    // Otherwise the first data set grows in from the baseline.
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(chart(reduceMotion: false));
+    expect(c.seriesById('bars')!.valueAt(2), 0);
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(c.seriesById('bars')!.valueAt(2), moreOrLessEquals(15, epsilon: 1e-6));
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(c.seriesById('bars')!.valueAt(2), 30);
+  });
 }

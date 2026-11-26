@@ -43,6 +43,9 @@ class AnimatedChartData extends StatefulWidget {
   final double baseline;
 
   /// Whether the first data set grows in from [baseline].
+  ///
+  /// Like every transition of this widget, it is skipped when the platform
+  /// asks for reduced motion (`MediaQuery.disableAnimations`).
   final bool animateOnMount;
 
   @override
@@ -80,7 +83,19 @@ class _AnimatedChartDataState extends State<AnimatedChartData> with SingleTicker
     _from = _Snapshot.empty(widget.data.valueColumns);
     _to = _Snapshot(widget.data);
     widget.data.addListener(_retarget);
-    if (widget.animateOnMount) {
+  }
+
+  bool _mounted = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_mounted) return;
+    _mounted = true;
+    // The first show. It waits for this method, the first place where the
+    // reduce-motion setting can be read.
+    final bool reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (widget.animateOnMount && !reduceMotion && widget.duration > Duration.zero) {
       _animation.duration = widget.duration;
       _write(0);
       _animation.forward(from: 0);

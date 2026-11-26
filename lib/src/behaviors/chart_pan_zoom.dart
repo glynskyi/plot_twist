@@ -112,7 +112,8 @@ class _ChartPanZoomState extends State<ChartPanZoom> with SingleTickerProviderSt
   ChartRegion _region = ChartRegion.plot;
   Object? _axisScale;
   bool _gestureActive = false;
-  final Set<Object> _interacting = <Object>{};
+  // The scales a gesture or fling of this widget is moving.
+  final Set<ChartScaleController> _interacting = <ChartScaleController>{};
 
   @override
   void didChangeDependencies() {
@@ -122,6 +123,9 @@ class _ChartPanZoomState extends State<ChartPanZoom> with SingleTickerProviderSt
 
   @override
   void dispose() {
+    // The widget may be removed with a finger still down. The end of that
+    // gesture never arrives here, so the scales are released now.
+    _gestureActive = false;
     _stopFling();
     _ticker?.dispose();
     super.dispose();
@@ -163,12 +167,15 @@ class _ChartPanZoomState extends State<ChartPanZoom> with SingleTickerProviderSt
   }
 
   void _begin(Object id) {
-    if (_interacting.add(id)) _controller.scale(id).beginInteraction();
+    final ChartScaleController scale = _controller.scale(id);
+    if (_interacting.add(scale)) scale.beginInteraction();
   }
 
+  // Ends the interaction on the scales it began on, which are not
+  // necessarily those of the chart's current controller.
   void _endAll() {
-    for (final Object id in _interacting) {
-      _controller.scale(id).endInteraction();
+    for (final ChartScaleController scale in _interacting) {
+      scale.endInteraction();
     }
     _interacting.clear();
   }

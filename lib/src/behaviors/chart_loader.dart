@@ -12,6 +12,10 @@ import '../../plot_twist.dart';
 /// the new rows to [data] (`prependAll` / `addAll`) and complete the future
 /// with `false` when that side has nothing more to load.
 ///
+/// A load that fails is reported to [onError]. That side is asked again when
+/// the visible window or the data next changes, and so is a side that said
+/// there was more but added no rows.
+///
 /// Loading never blocks scrolling: the window lives in data space, so the
 /// user can keep panning into the part that is still on its way, and rows
 /// that arrive do not move what is on screen.
@@ -25,6 +29,7 @@ class ChartLoader extends StatefulWidget {
     this.prefetch = 0.5,
     this.xScale = kChartX,
     this.onLoadingChanged,
+    this.onError,
   });
 
   /// The store whose x extent is "what is loaded".
@@ -47,6 +52,11 @@ class ChartLoader extends StatefulWidget {
   /// Called when a load starts or finishes, with whether any is running.
   final ValueChanged<bool>? onLoadingChanged;
 
+  /// Called when a load fails: its future completes with an error, or the
+  /// callback throws. Without it the error is reported through
+  /// [FlutterError.reportError].
+  final void Function(Object error, StackTrace stackTrace)? onError;
+
   @override
   State<ChartLoader> createState() => _ChartLoaderState();
 }
@@ -57,40 +67,60 @@ class _ChartLoaderState extends State<ChartLoader> {
   bool _loadingAfter = false;
   bool _doneBefore = false;
   bool _doneAfter = false;
+  // A side whose last load failed, or added nothing although it said there
+  // was more. It waits until the window or the data changes.
+  bool _stalledBefore = false;
+  bool _stalledAfter = false;
 
   @override
   void initState() {
     super.initState();
-    widget.data.addListener(_check);
+    widget.data.addListener(_handleChange);
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final ChartScaleController scale = ChartScope.of(context).controller.scale(widget.xScale);
-    if (!identical(scale, _scale)) {
-      _scale?.removeListener(_check);
-      _scale = scale..addListener(_check);
-    }
-    WidgetsBinding.instance.addPostFrameCallback((Duration _) => _check());
+    _attachScale();
   }
 
   @override
   void didUpdateWidget(ChartLoader oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.data, widget.data)) {
-      oldWidget.data.removeListener(_check);
-      widget.data.addListener(_check);
+      oldWidget.data.removeListener(_handleChange);
+      widget.data.addListener(_handleChange);
       _doneBefore = false;
       _doneAfter = false;
+      _stalledBefore = false;
+      _stalledAfter = false;
     }
+    if (oldWidget.xScale != widget.xScale) _attachScale();
   }
 
   @override
   void dispose() {
-    _scale?.removeListener(_check);
-    widget.data.removeListener(_check);
+    _scale?.removeListener(_handleChange);
+    widget.data.removeListener(_handleChange);
     super.dispose();
+  }
+
+  // Listens to the scale named by the widget, and looks at it once the frame
+  // is done: a load must not start while widgets are being built.
+  void _attachScale() {
+    final ChartScaleController scale = ChartScope.of(context).controller.scale(widget.xScale);
+    if (!identical(scale, _scale)) {
+      _scale?.removeListener(_handleChange);
+      _scale = scale..addListener(_handleChange);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((Duration _) => _check());
+  }
+
+  // The window or the data changed: a side that was waiting may try again.
+  void _handleChange() {
+    _stalledBefore = false;
+    _stalledAfter = false;
+    _check();
   }
 
   void _check() {
@@ -103,34 +133,82 @@ class _ChartLoaderState extends State<ChartLoader> {
     if (before != null &&
         !_loadingBefore &&
         !_doneBefore &&
+        !_stalledBefore &&
         (loaded == null || window.min < loaded.min + margin)) {
-      _loadingBefore = true;
-      _announce();
-      unawaited(
-        before().then((bool more) {
-          _loadingBefore = false;
-          _doneBefore = !more;
-          _announce();
-          _check();
-        }),
-      );
+      _load(before, before: true);
     }
     final Future<bool> Function()? after = widget.onLoadAfter;
     if (after != null &&
         !_loadingAfter &&
         !_doneAfter &&
+        !_stalledAfter &&
         (loaded == null || window.max > loaded.max - margin)) {
-      _loadingAfter = true;
-      _announce();
-      unawaited(
-        after().then((bool more) {
-          _loadingAfter = false;
-          _doneAfter = !more;
-          _announce();
-          _check();
-        }),
-      );
+      _load(after, before: false);
     }
+  }
+
+  void _load(Future<bool> Function() callback, {required bool before}) {
+    final ChartData data = widget.data;
+    double? edge() => before ? data.xExtent?.min : data.xExtent?.max;
+    final double? edgeBefore = edge();
+    if (before) {
+      _loadingBefore = true;
+    } else {
+      _loadingAfter = true;
+    }
+    _announce();
+
+    void finish({required bool more, Object? error, StackTrace? stackTrace}) {
+      if (!mounted) return;
+      // A load for a store the widget no longer shows says nothing about the
+      // new one.
+      final bool current = identical(data, widget.data);
+      final bool failed = error != null;
+      final bool stalled = current && (failed || (more && edge() == edgeBefore));
+      if (before) {
+        _loadingBefore = false;
+        if (current) _doneBefore = !failed && !more;
+        _stalledBefore = stalled;
+      } else {
+        _loadingAfter = false;
+        if (current) _doneAfter = !failed && !more;
+        _stalledAfter = stalled;
+      }
+      _announce();
+      if (error != null) _report(error, stackTrace ?? StackTrace.current);
+      _check();
+    }
+
+    final Future<bool> result;
+    try {
+      result = callback();
+    } catch (error, stackTrace) {
+      finish(more: false, error: error, stackTrace: stackTrace);
+      return;
+    }
+    unawaited(
+      result.then(
+        (bool more) => finish(more: more),
+        onError: (Object error, StackTrace stackTrace) =>
+            finish(more: false, error: error, stackTrace: stackTrace),
+      ),
+    );
+  }
+
+  void _report(Object error, StackTrace stackTrace) {
+    final void Function(Object error, StackTrace stackTrace)? handler = widget.onError;
+    if (handler != null) {
+      handler(error, stackTrace);
+      return;
+    }
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: error,
+        stack: stackTrace,
+        library: 'plot_twist',
+        context: ErrorDescription('while a ChartLoader was loading more data'),
+      ),
+    );
   }
 
   void _announce() {
