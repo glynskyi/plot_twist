@@ -43,6 +43,7 @@ class LineSeries extends StatelessWidget {
     this.fillColor,
     this.fillGradient,
     this.baseline,
+    this.baseColumn,
     this.pointRadius = 0,
     this.visible = true,
     this.xScale = kChartX,
@@ -90,6 +91,16 @@ class LineSeries extends StatelessWidget {
   /// The data value the fill extends to. Null fills to the bottom of the plot.
   final double? baseline;
 
+  /// A value column holding the lower edge of the area, instead of
+  /// [baseline]: the area between two lines. With the layers of
+  /// `ChartData.stacked` this draws a stacked area chart.
+  ///
+  /// The area is then filled also without a [fillColor] or [fillGradient],
+  /// with the colour of the line at half its opacity. A row with a missing
+  /// value in either column is a gap. Such a series is never reduced to the
+  /// extremes of each pixel column, so it draws every visible row.
+  final int? baseColumn;
+
   /// Radius of the dots drawn on data points when they are far enough apart.
   /// `0` draws none.
   final double pointRadius;
@@ -132,6 +143,7 @@ class LineSeries extends StatelessWidget {
         fillColor: fillColor,
         fillGradient: fillGradient,
         baseline: baseline,
+        baseColumn: baseColumn,
         pointRadius: pointRadius,
         xScale: xScale,
         yScale: yScale,
@@ -156,6 +168,7 @@ class LineSeriesPainter extends ChartSeriesPainter {
     this.fillColor,
     this.fillGradient,
     this.baseline,
+    this.baseColumn,
     this.pointRadius = 0,
     this.decimate = true,
     super.xScale,
@@ -198,7 +211,11 @@ class LineSeriesPainter extends ChartSeriesPainter {
   /// Whether dense data is decimated.
   final bool decimate;
 
-  bool get _hasFill => fillColor != null || fillGradient != null;
+  /// The value column holding the lower edge of the area, instead of
+  /// [baseline].
+  final int? baseColumn;
+
+  bool get _hasFill => fillColor != null || fillGradient != null || baseColumn != null;
 
   @override
   bool shouldRepaint(LineSeriesPainter oldDelegate) =>
@@ -212,6 +229,7 @@ class LineSeriesPainter extends ChartSeriesPainter {
       oldDelegate.fillColor != fillColor ||
       oldDelegate.fillGradient != fillGradient ||
       oldDelegate.baseline != baseline ||
+      oldDelegate.baseColumn != baseColumn ||
       oldDelegate.pointRadius != pointRadius ||
       oldDelegate.decimate != decimate;
 
@@ -220,6 +238,7 @@ class LineSeriesPainter extends ChartSeriesPainter {
       !identical(oldDelegate.data, data) ||
       oldDelegate.column != column ||
       oldDelegate.baseline != baseline ||
+      oldDelegate.baseColumn != baseColumn ||
       oldDelegate._hasFill != _hasFill;
 
   // ---------------------------------------------------------------- data
@@ -241,8 +260,20 @@ class LineSeriesPainter extends ChartSeriesPainter {
     } else {
       y = data.valueExtent(column: column, within: yWindow);
     }
+    final int? lower = baseColumn;
     final double? base = baseline;
-    if (y != null && _hasFill && base != null && (yWindow?.contains(base) ?? true)) {
+    if (lower != null) {
+      // The area reaches down to its base column, whatever the baseline is.
+      int start = 0;
+      int end = data.length;
+      if (xWindow != null && data.isSorted) {
+        (start, end) = data.indexRange(xWindow.min, xWindow.max, overscan: 0);
+      }
+      y = ChartRange.merge(
+        y,
+        data.valueExtent(column: lower, start: start, end: end, within: yWindow),
+      );
+    } else if (y != null && _hasFill && base != null && (yWindow?.contains(base) ?? true)) {
       y = y.include(base);
     }
     return ChartDataBounds(x: xWindow == null ? data.xExtent : data.xExtentWithin(xWindow), y: y);
@@ -346,7 +377,15 @@ class LineSeriesPainter extends ChartSeriesPainter {
           ? (position.dx - query.position.dx).abs()
           : (position - query.position).distance;
       if (distance > query.maxDistance) return null;
-      return ChartHit(x: x, y: y, position: position, distance: distance, index: i);
+      final int? lower = baseColumn;
+      return ChartHit(
+        x: x,
+        y: y,
+        position: position,
+        distance: distance,
+        index: i,
+        base: lower == null ? null : data.value(i, lower),
+      );
     }
 
     if (query.mode == ChartHitMode.nearestX || !data.isSorted) {
@@ -385,12 +424,21 @@ class LineSeriesPainter extends ChartSeriesPainter {
     if (end <= start) return;
 
     final _Polyline line = _Polyline();
+    // The lower edge of the area, row for row with [line].
+    final int? lower = baseColumn;
+    final _Polyline? floor = lower == null ? null : _Polyline();
     final bool dense =
-        decimate && data.isSorted && curve == LineCurve.linear && (end - start) > xs.extent * 10;
+        decimate &&
+        data.isSorted &&
+        curve == LineCurve.linear &&
+        floor == null &&
+        (end - start) > xs.extent * 10;
     if (dense) {
       _collectDecimated(line, xs, ys, start, end);
-    } else {
+    } else if (floor == null) {
       _collectAll(line, xs, ys, start, end);
+    } else {
+      _collectBand(line, floor, xs, ys, start, end, lower!);
     }
     if (line.isEmpty) return;
     // Zoomed deep into sparse data, the rows next to the window are far off
@@ -404,18 +452,41 @@ class LineSeriesPainter extends ChartSeriesPainter {
     // change shape as rows come into view.
     Offset? before;
     Offset? after;
+    Offset? floorBefore;
+    Offset? floorAfter;
     if (smooth) {
       if (data.isSorted) {
         if (start > 0 && _pixelOf(start, xs, ys) != null) before = _pixelOf(start - 1, xs, ys);
         if (end < data.length && _pixelOf(end - 1, xs, ys) != null) after = _pixelOf(end, xs, ys);
+        if (lower != null) {
+          // The band breaks where either column has a gap, so both edges
+          // have a neighbour or neither has.
+          Offset? edge(int row) => _bandPixelOf(row, xs, ys, lower)?.$2;
+          if (before != null) {
+            floorBefore = edge(start - 1);
+            if (floorBefore == null || edge(start) == null) before = floorBefore = null;
+          }
+          if (after != null) {
+            floorAfter = edge(end);
+            if (floorAfter == null || edge(end - 1) == null) after = floorAfter = null;
+          }
+        }
       }
     } else {
       line.clampEnds(reachMin, reachMax, step: curve == LineCurve.step);
+      floor?.clampEnds(reachMin, reachMax, step: curve == LineCurve.step);
     }
 
-    // Adds the points [from, to) to [path] and returns the x of the two ends
-    // of what was added, or null when nothing was.
-    (double, double)? addCurve(ui.Path path, int from, int to) {
+    // Adds the points [from, to) of [line] to [path] and returns the x of the
+    // two ends of what was added, or null when nothing was.
+    (double, double)? addCurveOf(
+      _Polyline line,
+      ui.Path path,
+      int from,
+      int to, {
+      Offset? before,
+      Offset? after,
+    }) {
       if (smooth) {
         return _addSmooth(
           path,
@@ -433,30 +504,62 @@ class LineSeriesPainter extends ChartSeriesPainter {
       return (line.x(from), line.x(to - 1));
     }
 
+    (double, double)? addCurve(ui.Path path, int from, int to) =>
+        addCurveOf(line, path, from, to, before: before, after: after);
+
     final Canvas canvas = context.canvas;
     final Rect plot = Offset.zero & view.size;
     final Color color = this.color ?? context.seriesColor;
 
     if (_hasFill) {
       // A base the scale cannot show is the edge of the plot.
-      final double base = baseline == null
-          ? view.size.height
+      final double base = baseline == null || floor != null
+          ? ys.extent * 2
           : ys.toPixel(baseline!).clamp(-ys.extent, ys.extent * 2);
       final ui.Path fill = ui.Path();
-      line.forEachSegment((int from, int to) {
-        if (to - from < 2) return;
-        final (double, double)? ends = addCurve(fill, from, to);
+      void addArea(_Polyline edge, int from, int to, {Offset? before, Offset? after}) {
+        final (double, double)? ends = addCurveOf(
+          edge,
+          fill,
+          from,
+          to,
+          before: before,
+          after: after,
+        );
         if (ends == null) return;
         fill.lineTo(ends.$2, base);
         fill.lineTo(ends.$1, base);
         fill.close();
-      });
+      }
+
+      if (floor == null) {
+        final double bottom = baseline == null ? view.size.height : base;
+        line.forEachSegment((int from, int to) {
+          if (to - from < 2) return;
+          final (double, double)? ends = addCurve(fill, from, to);
+          if (ends == null) return;
+          fill.lineTo(ends.$2, bottom);
+          fill.lineTo(ends.$1, bottom);
+          fill.close();
+        });
+      } else {
+        // The area under the line and the area under its lower edge, both
+        // down to the same level far below the plot. Filled by the even-odd
+        // rule, what is left is the part between the two, also where they
+        // cross.
+        fill.fillType = ui.PathFillType.evenOdd;
+        line.forEachSegment((int from, int to) {
+          if (to - from < 2) return;
+          addArea(line, from, to, before: before, after: after);
+          addArea(floor, from, to, before: floorBefore, after: floorAfter);
+        });
+      }
       final Paint paint = Paint()..style = PaintingStyle.fill;
       final Gradient? gradient = fillGradient;
       if (gradient != null) {
         paint.shader = gradient.createShader(plot);
       } else {
-        paint.color = fillColor!;
+        paint.color = fillColor ?? color.withValues(alpha: color.a / 2);
       }
       canvas.drawPath(fill, paint);
     }
@@ -595,6 +698,39 @@ class LineSeriesPainter extends ChartSeriesPainter {
           length += metric.length;
         }
         return length;
+    }
+  }
+
+  // The pixel positions of the line and of its lower edge in row [i], or null
+  // when the row is a gap in either. A lower edge the scale cannot show is at
+  // the edge of the plot it lies beyond.
+  (Offset, Offset)? _bandPixelOf(int i, ChartScaleView xs, ChartScaleView ys, int lower) {
+    final Offset? top = _pixelOf(i, xs, ys);
+    final double base = data.value(i, lower);
+    if (top == null || base.isNaN) return null;
+    final double py = ys.toPixel(base).clamp(-ys.extent, ys.extent * 2);
+    return py.isNaN ? null : (top, Offset(top.dx, py));
+  }
+
+  // Adds the rows to the line and to its lower edge, breaking both at a gap.
+  void _collectBand(
+    _Polyline line,
+    _Polyline floor,
+    ChartScaleView xs,
+    ChartScaleView ys,
+    int start,
+    int end,
+    int lower,
+  ) {
+    for (int i = start; i < end; i++) {
+      final (Offset, Offset)? pixels = _bandPixelOf(i, xs, ys, lower);
+      if (pixels == null) {
+        line.breakSegment();
+        floor.breakSegment();
+      } else {
+        line.add(pixels.$1.dx, pixels.$1.dy);
+        floor.add(pixels.$2.dx, pixels.$2.dy);
+      }
     }
   }
 

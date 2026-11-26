@@ -1,3 +1,7 @@
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
+import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -9,6 +13,31 @@ Widget host(Widget chart, {Size size = const Size(400, 300)}) => Directionality(
     child: SizedBox(width: size.width, height: size.height, child: chart),
   ),
 );
+
+/// Renders [chart] on white in the 400x300 host and returns a function that
+/// reads the ARGB value of a pixel.
+Future<int Function(int x, int y)> renderPixels(WidgetTester tester, Widget chart) async {
+  const Key key = Key('shot');
+  await tester.pumpWidget(
+    host(
+      RepaintBoundary(
+        key: key,
+        child: ColoredBox(color: const Color(0xFFFFFFFF), child: chart),
+      ),
+    ),
+  );
+  final RenderRepaintBoundary boundary = tester.renderObject(find.byKey(key));
+  late Uint8List bytes;
+  await tester.runAsync(() async {
+    final ui.Image image = await boundary.toImage();
+    bytes = (await image.toByteData())!.buffer.asUint8List();
+    image.dispose();
+  });
+  return (int x, int y) {
+    final int i = (y * 400 + x) * 4;
+    return bytes[i + 3] << 24 | bytes[i] << 16 | bytes[i + 1] << 8 | bytes[i + 2];
+  };
+}
 
 /// Centre of the widget keyed `Key('marker')`.
 Offset markerCenter(WidgetTester tester) => tester.getCenter(find.byKey(const Key('marker')));

@@ -51,6 +51,12 @@ The painters of the three series are renamed in the same way.
 - `CandlestickSeries(style:)`: `CandleStyle.hollow` outlines the candles that
   close at or above their open, `CandleStyle.ohlc` draws OHLC bars. Both are
   still two draw calls per frame.
+- Stacked areas: `LineSeries(baseColumn:)` fills between the line and
+  another value column, and takes the layers of `ChartData.stacked` as
+  `BarSeries` does. Such a series draws every visible row; it is not reduced
+  to the extremes of each pixel column.
+- `ChartData.stacked(layers, diverging: true)` stacks negative values
+  downwards from zero, for stacks with gains and losses.
 - `ChartReferenceLine.y(value)` and `.x(value)`: a line across the plot at a
   threshold, a target or an average, with an optional dash pattern and a
   label widget that follows the line. `includeInRange` widens automatic

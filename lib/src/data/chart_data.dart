@@ -78,26 +78,35 @@ class ChartData extends ChangeNotifier {
   /// Stacks [layers], which must share their x values, on top of each other.
   ///
   /// Returns one store per layer with two value columns: column 0 is the top
-  /// of the layer and column 1 its bottom — ready for a bar series with
-  /// `baseColumn: 1`. A missing value (NaN) counts as 0, and negative values
-  /// are added to the same running total as positive ones. The result is a
-  /// copy: it does not follow later changes to [layers].
-  static List<ChartData> stacked(List<ChartData> layers) {
+  /// of the layer and column 1 its bottom — ready for a bar series or a line
+  /// series with `baseColumn: 1`. A missing value (NaN) counts as 0. The
+  /// result is a copy: it does not follow later changes to [layers].
+  ///
+  /// Negative values are added to the same running total as positive ones.
+  /// With [diverging] they stack downwards from zero instead, each sign on
+  /// its own total, which is what stacked bars with gains and losses need.
+  static List<ChartData> stacked(List<ChartData> layers, {bool diverging = false}) {
     final List<ChartData> result = <ChartData>[];
-    List<double>? running;
+    List<double>? above;
+    List<double>? below;
     for (final ChartData layer in layers) {
       final int n = layer.length;
-      final List<double> base = running ?? List<double>.filled(n, 0);
-      assert(base.length == n, 'Stacked layers must have the same number of rows');
-      final List<double> top = List<double>.generate(n, (int i) {
+      final List<double> up = above ??= List<double>.filled(n, 0);
+      final List<double> down = below ??= List<double>.filled(n, 0);
+      assert(up.length == n, 'Stacked layers must have the same number of rows');
+      final List<double> top = List<double>.filled(n, 0);
+      final List<double> base = List<double>.filled(n, 0);
+      for (int i = 0; i < n; i++) {
         final double v = layer.y(i);
-        return base[i] + (v.isNaN ? 0 : v);
-      });
+        final double value = v.isNaN ? 0 : v;
+        final List<double> total = diverging && value < 0 ? down : up;
+        base[i] = total[i];
+        top[i] = total[i] += value;
+      }
       result.add(
         ChartData(valueColumns: 2, capacity: n)
           ..addRows(List<double>.generate(n, layer.x), <List<double>>[top, base]),
       );
-      running = top;
     }
     return result;
   }
