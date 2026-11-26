@@ -238,6 +238,42 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('a series with a gap at the focused x is left out of the hits', (
+    WidgetTester tester,
+  ) async {
+    final ChartController c = ChartController();
+    addTearDown(c.dispose);
+    final List<double> xs = <double>[0, 10, 20, 30];
+    // A NaN says "no value here". It is not replaced by a neighbouring row.
+    final ChartData a = ChartData.fromXY(xs, <double>[10, 20, 30, 40]);
+    final ChartData b = ChartData.fromXY(xs, <double>[50, 60, double.nan, 80]);
+    await tester.pumpWidget(
+      host(
+        Chart(
+          controller: c,
+          x: const LinearScale(range: FixedRange(0, 30)),
+          y: _y,
+          children: <Widget>[
+            LineSeries(data: a, label: 'A'),
+            LineSeries(data: b, label: 'B'),
+            BarSeries(data: b, label: 'bars', step: 10),
+            const ChartCrosshair(),
+            const ChartTooltip(),
+          ],
+        ),
+      ),
+    );
+    expect(c.hitsAt(10).map((ChartHit h) => h.series?.label), <String?>['A', 'B', 'bars']);
+    expect(c.hitsAt(20).map((ChartHit h) => h.series?.label), <String?>['A']);
+
+    final TestPointer mouse = TestPointer(1, PointerDeviceKind.mouse);
+    await tester.sendEventToBinding(mouse.hover(Offset(c.view!.x.toPixel(21), 100)));
+    await tester.pump();
+    expect(c.focus.value?.x, 20);
+    expect(find.textContaining('A: '), findsOneWidget);
+    expect(find.textContaining('B: '), findsNothing);
+  });
+
   testWidgets('bar, scatter and line series share one plot with two y scales', (
     WidgetTester tester,
   ) async {
