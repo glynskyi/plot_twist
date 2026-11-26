@@ -105,6 +105,137 @@ void main() {
     }
   });
 
+  group('LineSeries at the plot edges', () {
+    testWidgets('a stepped line stays level up to the edge when the row before is far away', (
+      WidgetTester tester,
+    ) async {
+      final ChartController c = ChartController();
+      addTearDown(c.dispose);
+      // The value 10 holds from x = 0 to x = 1000, where it steps up to 90.
+      final ChartData data = ChartData.fromXY(<double>[0, 1000, 2000], <double>[10, 90, 50]);
+      Widget chart({Color? fill}) => host(
+        Chart(
+          controller: c,
+          x: const LinearScale(range: FixedRange(990, 1010)),
+          y: _y,
+          children: <Widget>[
+            LineSeries(
+              data: data,
+              curve: LineCurve.step,
+              width: fill == null ? 2 : 0,
+              fillColor: fill,
+              baseline: 0,
+            ),
+          ],
+        ),
+      );
+      await tester.pumpWidget(chart());
+      final ChartView view = c.view!;
+      // 20 px per unit: the first row is 19,800 px left of the plot.
+      expect(view.x.toPixel(0), -19800);
+      final ui.Path line = _paths(_painter<LineSeriesPainter>(tester), view).single;
+      final Rect bounds = line.getBounds();
+      expect(bounds.bottom, view.y.toPixel(10));
+      expect(bounds.top, view.y.toPixel(90));
+      expect(bounds.left, greaterThanOrEqualTo(-400));
+      expect(bounds.right, lessThanOrEqualTo(800));
+      // The line enters the plot at the first value and runs level to the step.
+      final ui.PathMetric metric = line.computeMetrics().single;
+      final double toEdge = -bounds.left;
+      expect(
+        metric.getTangentForOffset(toEdge)!.position,
+        offsetMoreOrLessEquals(Offset(0, view.y.toPixel(10)), epsilon: 1e-3),
+      );
+      expect(
+        metric.getTangentForOffset(toEdge + 199)!.position,
+        offsetMoreOrLessEquals(Offset(199, view.y.toPixel(10)), epsilon: 1e-3),
+      );
+      // After the step it runs level at 90, with no second step in reach.
+      expect(metric.getTangentForOffset(metric.length)!.position.dy, view.y.toPixel(90));
+
+      await tester.pumpWidget(chart(fill: _black));
+      final ui.Path area = _paths(_painter<LineSeriesPainter>(tester), view).single;
+      expect(area.contains(Offset(100, view.y.toPixel(5))), isTrue);
+      expect(area.contains(Offset(100, view.y.toPixel(50))), isFalse, reason: 'above the line');
+      expect(area.contains(Offset(300, view.y.toPixel(50))), isTrue);
+    });
+
+    testWidgets('a smooth line is the same curve at every zoom, and valueAt lies on it', (
+      WidgetTester tester,
+    ) async {
+      final ChartController c = ChartController();
+      addTearDown(c.dispose);
+      final ChartData data = ChartData.fromXY(
+        <double>[0, 10, 25, 30, 50, 80, 100],
+        <double>[10, 80, 30, 60, 20, 90, 40],
+      );
+      await tester.pumpWidget(
+        host(
+          Chart(
+            controller: c,
+            x: const LinearScale(range: FixedRange(0, 100)),
+            y: _y,
+            children: <Widget>[LineSeries(data: data, curve: LineCurve.smooth)],
+          ),
+        ),
+      );
+      final ChartSeries series = c.series.single;
+
+      // The y of the drawn line at the pixel [x]: the line runs from left to
+      // right, so its length can be searched.
+      double drawnAt(ui.PathMetric metric, double x) {
+        double low = 0;
+        double high = metric.length;
+        for (int i = 0; i < 60; i++) {
+          final double mid = (low + high) / 2;
+          if (metric.getTangentForOffset(mid)!.position.dx < x) {
+            low = mid;
+          } else {
+            high = mid;
+          }
+        }
+        return metric.getTangentForOffset(low)!.position.dy;
+      }
+
+      int compared = 0;
+      // 100 px per unit, so the rows next to the window are up to 3,000 px
+      // away, and most windows hold no row at all.
+      for (int k = 0; k < 50; k++) {
+        final double min = 1 + k * 1.9;
+        c.x.jumpTo(min, min + 4);
+        await tester.pump();
+        final ChartView view = c.view!;
+        final ui.Path line = _paths(_painter<LineSeriesPainter>(tester), view).single;
+        final Rect bounds = line.getBounds();
+        expect(bounds.left, greaterThanOrEqualTo(-400.001), reason: 'window from $min');
+        expect(bounds.right, lessThanOrEqualTo(800.001), reason: 'window from $min');
+        final ui.PathMetric metric = line.computeMetrics().single;
+        for (final double pixel in <double>[0, 137, 400]) {
+          final double? value = series.valueAt(view.x.toValue(pixel));
+          expect(value, isNotNull);
+          expect(
+            drawnAt(metric, pixel),
+            moreOrLessEquals(view.y.toPixel(value!), epsilon: 0.5),
+            reason: 'window from $min, at pixel $pixel',
+          );
+          compared++;
+        }
+      }
+      expect(compared, 150);
+    });
+
+    test('a dash pattern is compared by its values', () {
+      final ChartData data = ChartData.fromValues(<double>[1, 2, 3]);
+      addTearDown(data.dispose);
+      LineSeriesPainter painter(List<double>? dash) =>
+          LineSeriesPainter(data: data, color: _black, dash: dash);
+      expect(painter(<double>[4, 2]).shouldRepaint(painter(<double>[4, 2])), isFalse);
+      expect(painter(<double>[4, 2]).shouldRepaint(painter(<double>[4, 3])), isTrue);
+      expect(painter(<double>[4, 2]).shouldRepaint(painter(null)), isTrue);
+      expect(painter(null).shouldRepaint(painter(null)), isFalse);
+    });
+  });
+
   group('BarSeries', () {
     testWidgets('floating bars span from the base column to the value', (
       WidgetTester tester,

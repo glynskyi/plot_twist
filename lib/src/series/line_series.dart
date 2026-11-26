@@ -1,7 +1,7 @@
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../plot_twist.dart';
@@ -207,7 +207,7 @@ class LineSeriesPainter extends ChartSeriesPainter {
       oldDelegate.color != color ||
       oldDelegate.width != width ||
       oldDelegate.curve != curve ||
-      oldDelegate.dash != dash ||
+      !listEquals(oldDelegate.dash, dash) ||
       oldDelegate.shader != shader ||
       oldDelegate.fillColor != fillColor ||
       oldDelegate.fillGradient != fillGradient ||
@@ -248,6 +248,12 @@ class LineSeriesPainter extends ChartSeriesPainter {
     return ChartDataBounds(x: xWindow == null ? data.xExtent : data.xExtentWithin(xWindow), y: y);
   }
 
+  /// The value of the drawn line at [x], or null outside the data, next to a
+  /// gap, or when the rows are not sorted.
+  ///
+  /// A [LineCurve.smooth] line is shaped on screen. On a scale that is not
+  /// linear, such as a logarithmic one, the result between two rows is close
+  /// to the drawn curve but not exactly on it.
   @override
   double? valueAt(double x) {
     if (data.isEmpty || !data.isSorted) return null;
@@ -282,13 +288,9 @@ class LineSeriesPainter extends ChartSeriesPainter {
       final bool hasBefore = before >= 0 && !data.value(before, column).isNaN;
       final bool hasAfter = after < data.length && !data.value(after, column).isNaN;
       final double slope = (y1 - y0) / (x1 - x0);
-      if (!hasBefore && !hasAfter) return slope;
-      if (!hasBefore) {
-        return _edgeSlope(slope);
-      }
-      if (!hasAfter) {
-        return _edgeSlope(slope);
-      }
+      // At an end of the line, or next to a gap, the curve leaves along the
+      // straight line to its only neighbour.
+      if (!hasBefore || !hasAfter) return slope;
       return _steffen(
         data.x(before),
         data.value(before, column), //
@@ -310,8 +312,6 @@ class LineSeriesPainter extends ChartSeriesPainter {
         (-2 * t3 + 3 * t2) * y1 +
         (t3 - t2) * h * m1;
   }
-
-  static double _edgeSlope(double slope) => slope;
 
   // Steffen's monotone tangent at the middle of three points.
   static double _steffen(double x0, double y0, double x1, double y1, double x2, double y2) {
@@ -391,8 +391,46 @@ class LineSeriesPainter extends ChartSeriesPainter {
     } else {
       _collectAll(line, xs, ys, start, end);
     }
-    line.clampEnds(-xs.extent, xs.extent * 2);
     if (line.isEmpty) return;
+    // Zoomed deep into sparse data, the rows next to the window are far off
+    // screen. Rasterizers should never see such coordinates, so nothing is
+    // drawn further out than one plot width.
+    final double reachMin = -xs.extent;
+    final double reachMax = xs.extent * 2;
+    final bool smooth = curve == LineCurve.smooth;
+    // A smooth curve also depends on the row before its first point and the
+    // one after its last. Without them the piece at the plot's edge would
+    // change shape as rows come into view.
+    Offset? before;
+    Offset? after;
+    if (smooth) {
+      if (data.isSorted) {
+        if (start > 0 && _pixelOf(start, xs, ys) != null) before = _pixelOf(start - 1, xs, ys);
+        if (end < data.length && _pixelOf(end - 1, xs, ys) != null) after = _pixelOf(end, xs, ys);
+      }
+    } else {
+      line.clampEnds(reachMin, reachMax, step: curve == LineCurve.step);
+    }
+
+    // Adds the points [from, to) to [path] and returns the x of the two ends
+    // of what was added, or null when nothing was.
+    (double, double)? addCurve(ui.Path path, int from, int to) {
+      if (smooth) {
+        return _addSmooth(
+          path,
+          line,
+          from,
+          to,
+          before: from == 0 ? before : null,
+          after: to == line.length ? after : null,
+          min: reachMin,
+          max: reachMax,
+          cut: data.isSorted,
+        );
+      }
+      _addSegment(path, line, from, to);
+      return (line.x(from), line.x(to - 1));
+    }
 
     final Canvas canvas = context.canvas;
     final Rect plot = Offset.zero & view.size;
@@ -405,9 +443,10 @@ class LineSeriesPainter extends ChartSeriesPainter {
       final ui.Path fill = ui.Path();
       line.forEachSegment((int from, int to) {
         if (to - from < 2) return;
-        _addSegment(fill, line, from, to);
-        fill.lineTo(line.x(to - 1), base);
-        fill.lineTo(line.x(from), base);
+        final (double, double)? ends = addCurve(fill, from, to);
+        if (ends == null) return;
+        fill.lineTo(ends.$2, base);
+        fill.lineTo(ends.$1, base);
         fill.close();
       });
       final Paint paint = Paint()..style = PaintingStyle.fill;
@@ -428,7 +467,7 @@ class LineSeriesPainter extends ChartSeriesPainter {
           path.moveTo(line.x(from), line.y(from));
           path.lineTo(line.x(from) + 0.01, line.y(from));
         } else {
-          _addSegment(path, line, from, to);
+          addCurve(path, from, to);
         }
       });
       final List<double>? pattern = dash;
@@ -449,13 +488,16 @@ class LineSeriesPainter extends ChartSeriesPainter {
       final double spacing = xs.extent / math.max(1, end - start);
       if (spacing >= pointRadius * 3) {
         final Float32List points = Float32List(count * 2);
+        int n = 0;
         for (int i = 0; i < count; i++) {
-          points[i * 2] = line.x(i);
-          points[i * 2 + 1] = line.y(i);
+          final double px = line.x(i);
+          if (px < reachMin || px > reachMax) continue;
+          points[n++] = px;
+          points[n++] = line.y(i);
         }
         canvas.drawRawPoints(
           ui.PointMode.points,
-          points,
+          Float32List.sublistView(points, 0, n),
           Paint()
             ..color = color
             ..strokeCap = StrokeCap.round
@@ -469,6 +511,14 @@ class LineSeriesPainter extends ChartSeriesPainter {
     for (int i = start; i < end; i++) {
       _addRow(out, xs, ys, i);
     }
+  }
+
+  // The pixel position of row [i], or null when the row is a gap.
+  Offset? _pixelOf(int i, ChartScaleView xs, ChartScaleView ys) {
+    final double v = data.value(i, column);
+    if (v.isNaN) return null;
+    final Offset pixel = Offset(xs.toPixel(data.x(i)), ys.toPixel(v));
+    return pixel.isFinite ? pixel : null;
   }
 
   // Adds row [i] to the line, or breaks the line there when the row is a gap:
@@ -548,55 +598,119 @@ class LineSeriesPainter extends ChartSeriesPainter {
     raw(row, end);
   }
 
+  // Adds the straight or stepped line through the points [from, to).
   void _addSegment(ui.Path path, _Polyline line, int from, int to) {
     path.moveTo(line.x(from), line.y(from));
-    switch (curve) {
-      case LineCurve.linear:
-        for (int i = from + 1; i < to; i++) {
-          path.lineTo(line.x(i), line.y(i));
-        }
-      case LineCurve.step:
-        for (int i = from + 1; i < to; i++) {
-          path.lineTo(line.x(i), line.y(i - 1));
-          path.lineTo(line.x(i), line.y(i));
-        }
-      case LineCurve.smooth:
-        if (to - from == 2) {
-          path.lineTo(line.x(from + 1), line.y(from + 1));
-          return;
-        }
-        double tangentAt(int i) {
-          if (i == from) {
-            return (line.y(i + 1) - line.y(i)) / _nonZero(line.x(i + 1) - line.x(i));
-          }
-          if (i == to - 1) {
-            return (line.y(i) - line.y(i - 1)) / _nonZero(line.x(i) - line.x(i - 1));
-          }
-          return _steffen(
-            line.x(i - 1),
-            line.y(i - 1), //
-            line.x(i),
-            line.y(i),
-            line.x(i + 1),
-            line.y(i + 1),
-          );
-        }
-
-        double m0 = tangentAt(from);
-        for (int i = from; i < to - 1; i++) {
-          final double m1 = tangentAt(i + 1);
-          final double h = line.x(i + 1) - line.x(i);
-          path.cubicTo(
-            line.x(i) + h / 3,
-            line.y(i) + m0 * h / 3, //
-            line.x(i + 1) - h / 3,
-            line.y(i + 1) - m1 * h / 3,
-            line.x(i + 1),
-            line.y(i + 1),
-          );
-          m0 = m1;
-        }
+    if (curve == LineCurve.step) {
+      for (int i = from + 1; i < to; i++) {
+        path.lineTo(line.x(i), line.y(i - 1));
+        path.lineTo(line.x(i), line.y(i));
+      }
+    } else {
+      for (int i = from + 1; i < to; i++) {
+        path.lineTo(line.x(i), line.y(i));
+      }
     }
+  }
+
+  // Adds the smooth curve through the points [from, to) and returns the x of
+  // its two ends, or null when none of it is between [min] and [max].
+  //
+  // [before] and [after] are the positions of the rows next to the first and
+  // the last point, when the line goes on there. With [cut], only the part
+  // between [min] and [max] is added. Each piece between two points is a
+  // cubic, and a part of a cubic is a cubic again, so cutting keeps the shape
+  // exactly; pulling a far point in would bend the curve.
+  (double, double)? _addSmooth(
+    ui.Path path,
+    _Polyline line,
+    int from,
+    int to, {
+    required Offset? before,
+    required Offset? after,
+    required double min,
+    required double max,
+    required bool cut,
+  }) {
+    // The slope of the curve at point [i]: Steffen's monotone tangent between
+    // two neighbours, the straight line to the only neighbour at an end.
+    double tangentAt(int i) {
+      final double x = line.x(i);
+      final double y = line.y(i);
+      final bool hasPrevious = i > from || before != null;
+      final bool hasNext = i < to - 1 || after != null;
+      final double px = i > from ? line.x(i - 1) : (before?.dx ?? 0);
+      final double py = i > from ? line.y(i - 1) : (before?.dy ?? 0);
+      final double nx = i < to - 1 ? line.x(i + 1) : (after?.dx ?? 0);
+      final double ny = i < to - 1 ? line.y(i + 1) : (after?.dy ?? 0);
+      if (hasPrevious && hasNext) return _steffen(px, py, x, y, nx, ny);
+      if (hasNext) return (ny - y) / _nonZero(nx - x);
+      return (y - py) / _nonZero(x - px);
+    }
+
+    double? first;
+    double last = 0;
+    bool penDown = false;
+    double m0 = tangentAt(from);
+    for (int i = from; i < to - 1; i++) {
+      final double m1 = tangentAt(i + 1);
+      final double x0 = line.x(i);
+      final double y0 = line.y(i);
+      final double x1 = line.x(i + 1);
+      final double y1 = line.y(i + 1);
+      final double h = x1 - x0;
+      // The part of this piece to draw, as fractions of its width.
+      double a = 0;
+      double b = 1;
+      if (cut && h != 0) {
+        if (math.max(x0, x1) < min || math.min(x0, x1) > max) {
+          penDown = false;
+          m0 = m1;
+          continue;
+        }
+        a = (x0.clamp(min, max) - x0) / h;
+        b = (x1.clamp(min, max) - x0) / h;
+      }
+      // The piece as a Bezier curve: x is linear, these are the y ordinates.
+      final double c1 = y0 + m0 * h / 3;
+      final double c2 = y1 - m1 * h / 3;
+      if (a <= 0 && b >= 1) {
+        if (!penDown) path.moveTo(x0, y0);
+        path.cubicTo(x0 + h / 3, c1, x1 - h / 3, c2, x1, y1);
+        first ??= x0;
+        last = x1;
+      } else {
+        final double xa = x0 + h * a;
+        final double xb = x0 + h * b;
+        final double third = (xb - xa) / 3;
+        if (!penDown) path.moveTo(xa, _blossom(y0, c1, c2, y1, a, a, a));
+        path.cubicTo(
+          xa + third,
+          _blossom(y0, c1, c2, y1, a, a, b),
+          xb - third,
+          _blossom(y0, c1, c2, y1, a, b, b),
+          xb,
+          _blossom(y0, c1, c2, y1, b, b, b),
+        );
+        first ??= xa;
+        last = xb;
+      }
+      penDown = true;
+      m0 = m1;
+    }
+    return first == null ? null : (first, last);
+  }
+
+  // The blossom of the cubic with Bezier ordinates [p0] to [p3]: its value at
+  // (t, t, t) is the curve at t, and the values at (a, a, b) and (a, b, b)
+  // are the inner ordinates of the part between a and b.
+  static double _blossom(double p0, double p1, double p2, double p3, double u, double v, double w) {
+    final double q0 = p0 + (p1 - p0) * u;
+    final double q1 = p1 + (p2 - p1) * u;
+    final double q2 = p2 + (p3 - p2) * u;
+    final double r0 = q0 + (q1 - q0) * v;
+    final double r1 = q1 + (q2 - q1) * v;
+    return r0 + (r1 - r0) * w;
   }
 
   static double _nonZero(double v) => v == 0 ? 1e-9 : v;
@@ -657,15 +771,18 @@ class _Polyline {
 
   // Pulls far off-screen end points in along their segment, so rasterizers
   // never see huge coordinates when zoomed deep into sparse data.
-  void clampEnds(double min, double max) {
+  //
+  // A stepped line ([step]) is level between two points, at the value of the
+  // first one, so its end points move sideways only.
+  void clampEnds(double min, double max, {bool step = false}) {
     forEachSegment((int from, int to) {
       if (to - from < 2) return;
-      _clamp(from, from + 1, min, max);
-      _clamp(to - 1, to - 2, min, max);
+      _clamp(from, from + 1, min, max, level: step ? y(from) : null);
+      _clamp(to - 1, to - 2, min, max, level: step ? y(to - 2) : null);
     });
   }
 
-  void _clamp(int end, int neighbour, double min, double max) {
+  void _clamp(int end, int neighbour, double min, double max, {double? level}) {
     final double x0 = x(end);
     final double bound = x0 < min ? min : (x0 > max ? max : x0);
     if (bound == x0) return;
@@ -674,6 +791,6 @@ class _Polyline {
     final double t = (bound - x0) / (x1 - x0);
     if (t <= 0 || t >= 1) return;
     _points[end * 2] = bound;
-    _points[end * 2 + 1] = y(end) + (y(neighbour) - y(end)) * t;
+    _points[end * 2 + 1] = level ?? y(end) + (y(neighbour) - y(end)) * t;
   }
 }
