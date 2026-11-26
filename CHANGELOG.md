@@ -1,3 +1,10 @@
+## 0.2.1
+
+No code changes. The description, the topics and the feature list at the top
+of the README name what the package does in the words people search for:
+real-time data, time series, large datasets, stacked and horizontal bars. The
+topic `charts` replaces `data-visualization`.
+
 ## 0.2.0
 
 Horizontal bars, stacked areas, data labels, a legend, an appear animation,

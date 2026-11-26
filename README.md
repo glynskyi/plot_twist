@@ -24,13 +24,17 @@ instead of forking the library.
 - One small painter contract covers custom series. A custom series gets
   automatic ranges, tooltips and crosshairs for free, the same way the
   built-in line, bar, scatter and candlestick series do.
-- Bars stand or lie, bars and areas stack, and candles are filled, hollow or
-  OHLC bars. Data labels, a legend, reference lines and an appear animation
-  are layers you add.
-- Linear, log, time and band scales, or your own transform.
-- A million-point line pans and zooms without a missed frame on a Mac (see
-  [Performance](#performance)).
-- Live data and lazily loaded history. Linked charts share a viewport.
+- Line and area charts, vertical and horizontal bar charts, scatter plots
+  and candlestick charts. Stacked bars and stacked areas; candles that are
+  filled, hollow or OHLC bars. Data labels, a legend, reference lines and an
+  appear animation are layers you add.
+- Linear, log, time and band scales, or your own transform. A time scale
+  draws a time series with ticks that follow the calendar.
+- Large datasets: a million-point line pans and zooms without a missed frame
+  on a Mac (see [Performance](#performance)).
+- Real-time data and lazily loaded history: a streaming chart follows its
+  newest point, and older data loads as you scroll back. Linked charts share
+  a viewport.
 - No dependencies beyond Flutter's widgets layer. The package does not
   import Material or Cupertino.
 
