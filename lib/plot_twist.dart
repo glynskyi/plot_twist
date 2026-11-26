@@ -26,9 +26,11 @@ export 'src/layers/chart_data_labels.dart';
 export 'src/layers/chart_grid.dart';
 export 'src/layers/chart_legend.dart';
 export 'src/layers/chart_reference_line.dart';
-export 'src/rendering/render_chart_axis.dart';
-export 'src/rendering/render_chart_layout.dart';
-export 'src/rendering/render_chart_stack.dart';
+export 'src/rendering/render_chart_axis.dart'
+    hide RenderChartAxis, ChartAxisParentData, ChartAxisChildKind;
+export 'src/rendering/render_chart_layout.dart' hide RenderChartLayout, ChartLayoutParentData;
+export 'src/rendering/render_chart_stack.dart'
+    hide RenderChartStack, ChartStackParentData, ChartPlacement;
 export 'src/rendering/view_channel.dart';
 export 'src/series/bar_series.dart';
 export 'src/series/candlestick_series.dart';
@@ -37,8 +39,8 @@ export 'src/series/scatter_series.dart';
 export 'src/widgets/chart.dart';
 export 'src/widgets/chart_axis.dart';
 export 'src/widgets/chart_gesture_detector.dart';
-export 'src/widgets/chart_layout_builder.dart';
-export 'src/widgets/chart_paint.dart';
+export 'src/widgets/chart_layout_builder.dart' hide RenderChartLayoutBuilder;
+export 'src/widgets/chart_paint.dart' hide RenderChartPaint;
 export 'src/widgets/chart_scope.dart';
 export 'src/widgets/chart_stack.dart';
 export 'src/widgets/chart_theme.dart';

@@ -666,6 +666,55 @@ void main() {
     }
   });
 
+  test('the public library exports no render object and no parent data', () {
+    final String barrel = File('lib/plot_twist.dart').readAsStringSync();
+    final RegExp export = RegExp(r"export\s+'([^']+)'([^;]*);");
+    final RegExp declared = RegExp(r'^(?:abstract )?class (\w+)', multiLine: true);
+    for (final RegExpMatch match in export.allMatches(barrel)) {
+      final String source = File('lib/${match.group(1)}').readAsStringSync();
+      final String combinators = match.group(2)!;
+      for (final RegExpMatch type in declared.allMatches(source)) {
+        final String name = type.group(1)!;
+        if (!name.startsWith('Render') && !name.endsWith('ParentData')) continue;
+        expect(
+          RegExp('hide[^;]*\\b$name\\b').hasMatch(combinators),
+          isTrue,
+          reason: '${match.group(1)} exports $name',
+        );
+      }
+    }
+  });
+
+  test('a controller makes scales on demand until a chart has given it its scales', () {
+    final ChartController c = ChartController();
+    addTearDown(c.dispose);
+    final ChartScaleController early = c.scale('volume');
+    c.configure(const <Object, ChartScale>{kChartX: LinearScale(), 'price': LinearScale()});
+    expect(c.scale('volume'), same(early));
+    expect(c.scale('price'), isNotNull);
+    expect(() => c.scale('prcie'), throwsAssertionError);
+  });
+
+  testWidgets('a series on a scale the chart does not have fails with its name', (
+    WidgetTester tester,
+  ) async {
+    final List<Object> errors = <Object>[];
+    final void Function(FlutterErrorDetails)? handler = FlutterError.onError;
+    FlutterError.onError = (FlutterErrorDetails details) => errors.add(details.exception);
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Chart(
+          children: <Widget>[
+            LineSeries(data: ChartData.fromValues(<double>[1, 2]), yScale: 'rigth'),
+          ],
+        ),
+      ),
+    );
+    FlutterError.onError = handler;
+    expect(errors.whereType<AssertionError>().first.toString(), contains('"rigth"'));
+  });
+
   test('the package does not depend on Material or Cupertino', () {
     for (final FileSystemEntity entity in Directory('lib').listSync(recursive: true)) {
       if (entity is! File || !entity.path.endsWith('.dart')) continue;

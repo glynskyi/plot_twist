@@ -113,6 +113,7 @@ class ChartController {
   bool _propagating = false;
   bool _seriesOrderDirty = false;
   bool _listingChanged = false;
+  bool _configured = false;
   int _revision = 0;
   bool _disposed = false;
 
@@ -125,9 +126,22 @@ class ChartController {
   /// The default vertical scale.
   ChartScaleController get y => scale(kChartY);
 
-  /// The controller of the scale registered under [id], created on demand.
-  ChartScaleController scale(Object id) =>
-      _scales[id] ?? _adopt(id, ChartScaleController(), owned: true);
+  /// The controller of the scale registered under [id].
+  ///
+  /// Before a chart uses this controller, a scale is created on demand, so
+  /// it can be set up or shared first. Once a chart has given the controller
+  /// its scales, asking for one it does not have is a mistake, usually a
+  /// mistyped `xScale` or `yScale`, and fails an assertion.
+  ChartScaleController scale(Object id) {
+    final ChartScaleController? known = _scales[id];
+    if (known != null) return known;
+    assert(
+      !_configured,
+      'This chart has no scale "$id". Add it to Chart.yScales or Chart.xScales, '
+      'or check the xScale and yScale of its series and behaviors.',
+    );
+    return _adopt(id, ChartScaleController(), owned: true);
+  }
 
   /// Ids of all scales this controller knows about.
   Iterable<Object> get scaleIds => _scales.keys;
@@ -469,7 +483,10 @@ class ChartController {
   /// Applies scale configuration coming from a chart widget.
   @internal
   void configure(Map<Object, ChartScale> scales) {
-    scales.forEach((Object id, ChartScale config) => scale(id).configure(config));
+    scales.forEach((Object id, ChartScale config) {
+      (_scales[id] ?? _adopt(id, ChartScaleController(), owned: true)).configure(config);
+    });
+    _configured = true;
   }
 
   /// Lends every scale a ticker provider for animations.

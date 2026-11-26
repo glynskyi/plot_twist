@@ -1,5 +1,18 @@
 ## 0.2.0
 
+### Breaking
+
+- The library no longer exports its render objects and their parent data:
+  `RenderChartLayout`, `RenderChartStack`, `RenderChartAxis`,
+  `RenderChartPaint`, `RenderChartLayoutBuilder`, `ChartLayoutParentData`,
+  `ChartStackParentData`, `ChartAxisParentData`, `ChartPlacement` and
+  `ChartAxisChildKind`. They were implementation details; the widgets that
+  create them are unchanged.
+- `ChartController.scale(id)` fails an assertion for a scale the chart does
+  not have, once a chart uses the controller. It used to create that scale
+  silently, which hid a mistyped `xScale` or `yScale`. Before a chart uses
+  the controller, scales are still created on demand.
+
 ### Renamed
 
 The old names keep working and are marked as deprecated. They are removed in
