@@ -133,8 +133,8 @@ class ScatterSeriesPainter extends ChartSeriesPainter {
     if (data.isSorted || (xWindow == null && yWindow == null)) {
       final (int start, int end) = _rows(xWindow);
       return ChartDataBounds(
-        x: data.xExtent,
-        y: data.valueExtent(column: column, start: start, end: end),
+        x: xWindow == null ? data.xExtent : data.xExtentWithin(xWindow),
+        y: data.valueExtent(column: column, start: start, end: end, within: yWindow),
       );
     }
     // Unsorted data with a window: only rows inside it count.
@@ -145,14 +145,12 @@ class ScatterSeriesPainter extends ChartSeriesPainter {
     for (int i = 0; i < data.length; i++) {
       final double x = data.x(i);
       final double y = data.value(i, column);
-      if (xWindow == null || xWindow.contains(x)) {
-        if (y < lo) lo = y;
-        if (y > hi) hi = y;
-      }
-      if (yWindow == null || yWindow.contains(y)) {
-        if (x < xLo) xLo = x;
-        if (x > xHi) xHi = x;
-      }
+      if (xWindow != null && !xWindow.contains(x)) continue;
+      if (yWindow != null && !yWindow.contains(y)) continue;
+      if (y < lo && y != double.negativeInfinity) lo = y;
+      if (y > hi && y != double.infinity) hi = y;
+      if (x < xLo) xLo = x;
+      if (x > xHi) xHi = x;
     }
     return ChartDataBounds(
       x: xLo <= xHi ? ChartRange(xLo, xHi) : null,
@@ -175,6 +173,8 @@ class ScatterSeriesPainter extends ChartSeriesPainter {
       final double y = data.value(i, column);
       if (y.isNaN) continue;
       final Offset p = Offset(xs.toPixel(data.x(i)), ys.toPixel(y));
+      // A value the scale cannot show is not on the chart.
+      if (!p.isFinite) continue;
       final double d = query.mode == ChartHitMode.nearestX
           ? (p.dx - query.position.dx).abs()
           : (p - query.position).distance;

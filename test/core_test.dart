@@ -260,6 +260,57 @@ void main() {
       check();
     });
 
+    test('infinite values are missing data for extents, with or without the index', () {
+      // Short enough to be scanned.
+      final ChartData small = ChartData.fromValues(<double>[
+        3,
+        double.infinity,
+        -2,
+        double.negativeInfinity,
+        7,
+      ]);
+      expect(small.valueExtent(), const ChartRange(-2, 7));
+      expect(small.argMinMax(0, 5), (2, 4));
+      expect(
+        ChartData.fromValues(<double>[double.infinity, double.negativeInfinity]).valueExtent(),
+        isNull,
+      );
+
+      // Long enough for the index.
+      final ChartData large = ChartData.generate(10000, (int i) {
+        if (i % 1000 == 500) return (i.toDouble(), double.infinity);
+        if (i % 1000 == 700) return (i.toDouble(), double.negativeInfinity);
+        return (i.toDouble(), (i % 100).toDouble());
+      });
+      expect(large.valueExtent(), const ChartRange(0, 99));
+      expect(large.minMax(10, 9990), (0.0, 99.0));
+      final (int minIndex, int maxIndex) = large.argMinMax(450, 9000);
+      expect(large.y(minIndex), 0);
+      expect(large.y(maxIndex), 99);
+      // Rows appended later go through the index as well.
+      large.add(10000, double.infinity);
+      large.add(10001, 250);
+      expect(large.valueExtent(), const ChartRange(0, 250));
+    });
+
+    test('extents can be limited to the values inside a window', () {
+      final ChartData d = ChartData.fromXY(
+        <double>[-5, 0, 1, 10, 100],
+        <double>[0, -3, 5, double.nan, 500],
+      );
+      const ChartRange positive = ChartRange(double.minPositive, double.infinity);
+      expect(d.valueExtent(), const ChartRange(-3, 500));
+      expect(d.valueExtent(within: positive), const ChartRange(5, 500));
+      expect(d.valueExtent(within: positive, start: 0, end: 2), isNull);
+      expect(d.valueExtent(within: const ChartRange(-10, 1)), const ChartRange(-3, 0));
+      expect(d.xExtentWithin(positive), const ChartRange(1, 100));
+      expect(d.xExtentWithin(const ChartRange(200, 300)), isNull);
+
+      final ChartData unsorted = ChartData.fromXY(<double>[10, -1, 3, 0], <double>[1, 2, 3, 4]);
+      expect(unsorted.isSorted, isFalse);
+      expect(unsorted.xExtentWithin(positive), const ChartRange(3, 10));
+    });
+
     test('stacked layers carry their base', () {
       final List<ChartData> layers = ChartData.stacked(<ChartData>[
         ChartData.fromValues(<double>[1, 2]),

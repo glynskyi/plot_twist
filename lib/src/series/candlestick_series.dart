@@ -286,12 +286,12 @@ class CandlestickSeriesPainter extends ChartSeriesPainter {
     if (xWindow != null && data.isSorted) {
       (start, end) = data.indexRange(xWindow.min - half, xWindow.max + half, overscan: 0);
     }
-    final ChartRange? x = data.xExtent;
+    final ChartRange? x = xWindow == null ? data.xExtent : data.xExtentWithin(xWindow);
     return ChartDataBounds(
       x: x == null ? null : ChartRange(x.min - half, x.max + half),
       y: ChartRange.merge(
-        data.valueExtent(column: lowColumn, start: start, end: end),
-        data.valueExtent(column: highColumn, start: start, end: end),
+        data.valueExtent(column: lowColumn, start: start, end: end, within: yWindow),
+        data.valueExtent(column: highColumn, start: start, end: end, within: yWindow),
       ),
     );
   }
@@ -323,6 +323,8 @@ class CandlestickSeriesPainter extends ChartSeriesPainter {
       Offset(centre - half, ys.toPixel(candle.low)),
       Offset(centre + half, ys.toPixel(candle.high)),
     );
+    // A candle the scales cannot show is not on the chart.
+    if (!rect.isFinite) return;
     final Offset outside = Offset(
       math.max(0, (query.position.dx - rect.center.dx).abs() - rect.width / 2),
       math.max(0, (query.position.dy - rect.center.dy).abs() - rect.height / 2),

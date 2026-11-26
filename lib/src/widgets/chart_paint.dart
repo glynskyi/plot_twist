@@ -79,6 +79,12 @@ abstract class ChartSeriesPainter extends ChartPainter {
 
   /// The extent of the data, optionally restricted to what lies inside
   /// [xWindow] or [yWindow].
+  ///
+  /// A window is either what the other scale shows right now, which is how a
+  /// scale fits itself to the visible data, or the part of a scale that can
+  /// be shown at all (a logarithmic scale passes its positive values). So a
+  /// value outside [yWindow] should not count towards the y extent, and a
+  /// baseline outside it should not be added.
   ChartDataBounds? bounds({ChartRange? xWindow, ChartRange? yWindow});
 
   /// The y value of the drawn series at [x], or null.

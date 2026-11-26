@@ -415,11 +415,49 @@ class ChartData extends ChangeNotifier {
     return lo <= hi ? ChartRange(lo, hi) : null;
   }
 
+  /// The extent of the x values that lie inside [window], or null when there
+  /// are none.
+  ChartRange? xExtentWithin(ChartRange window) {
+    if (_length == 0) return null;
+    if (_sorted) {
+      final int first = lowerBound(window.min);
+      final int last = upperBound(window.max) - 1;
+      return last >= first ? ChartRange(x(first), x(last)) : null;
+    }
+    double lo = double.infinity;
+    double hi = double.negativeInfinity;
+    for (int i = 0; i < _length; i++) {
+      final double v = x(i);
+      if (v < window.min || v > window.max) continue;
+      if (v < lo) lo = v;
+      if (v > hi) hi = v;
+    }
+    return lo <= hi ? ChartRange(lo, hi) : null;
+  }
+
   /// The smallest and largest value of [column] in rows `[start, end)`, or
   /// null when there is no finite value there.
   ///
   /// Large stores answer this from a min/max index instead of scanning rows.
-  ChartRange? valueExtent({int column = 0, int start = 0, int? end}) {
+  /// With [within], only values inside that range count, and the rows are
+  /// scanned: this is what a scale that cannot show every value, such as a
+  /// logarithmic one, asks for.
+  ChartRange? valueExtent({int column = 0, int start = 0, int? end, ChartRange? within}) {
+    if (within != null) {
+      final int s = math.max(0, start);
+      final int e = math.min(_length, end ?? _length);
+      final Float64List values = _columns[column + 1];
+      double lo = double.infinity;
+      double hi = double.negativeInfinity;
+      for (int i = _start + s; i < _start + e; i++) {
+        final double v = values[i];
+        // False for NaN as well.
+        if (!(v >= within.min && v <= within.max) || !v.isFinite) continue;
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+      }
+      return lo <= hi ? ChartRange(lo, hi) : null;
+    }
     final (double lo, double hi) = minMax(start, end ?? _length, column: column);
     return lo <= hi ? ChartRange(lo, hi) : null;
   }
@@ -438,8 +476,8 @@ class ChartData extends ChangeNotifier {
     double hi = double.negativeInfinity;
     for (int i = _start + s; i < _start + e; i++) {
       final double v = values[i];
-      if (v < lo) lo = v;
-      if (v > hi) hi = v;
+      if (v < lo && v != double.negativeInfinity) lo = v;
+      if (v > hi && v != double.infinity) hi = v;
     }
     return (lo, hi);
   }
@@ -465,11 +503,11 @@ class ChartData extends ChangeNotifier {
     int maxIndex = -1;
     for (int i = s; i < e; i++) {
       final double v = values[base + i];
-      if (v < lo) {
+      if (v < lo && v != double.negativeInfinity) {
         lo = v;
         minIndex = i;
       }
-      if (v > hi) {
+      if (v > hi && v != double.infinity) {
         hi = v;
         maxIndex = i;
       }
@@ -496,7 +534,8 @@ class ChartData extends ChangeNotifier {
 }
 
 // A two-level block index over one value column: level 0 holds the min/max of
-// every 64 rows, level 1 of every 64 level-0 blocks. NaN values are ignored.
+// every 64 rows, level 1 of every 64 level-0 blocks. NaN and infinite values
+// are ignored.
 class _MinMaxIndex {
   _MinMaxIndex._(int blocks0)
     : _min0 = Float64List(blocks0),
@@ -545,10 +584,12 @@ class _MinMaxIndex {
         _max1[big] = double.negativeInfinity;
       }
     }
-    if (v < _min0[block]) _min0[block] = v;
-    if (v > _max0[block]) _max0[block] = v;
-    if (v < _min1[big]) _min1[big] = v;
-    if (v > _max1[big]) _max1[big] = v;
+    if (v.isFinite) {
+      if (v < _min0[block]) _min0[block] = v;
+      if (v > _max0[block]) _max0[block] = v;
+      if (v < _min1[big]) _min1[big] = v;
+      if (v > _max1[big]) _max1[big] = v;
+    }
     _rows++;
   }
 
@@ -611,8 +652,8 @@ class _MinMaxIndex {
     final int headEnd = math.min(end, ((start + _b0 - 1) ~/ _b0) * _b0);
     for (; i < headEnd; i++) {
       final double v = column[base + i];
-      if (v < lo) lo = v;
-      if (v > hi) hi = v;
+      if (v < lo && v != double.negativeInfinity) lo = v;
+      if (v > hi && v != double.infinity) hi = v;
     }
     if (i < end) {
       int block = i ~/ _b0;
@@ -638,8 +679,8 @@ class _MinMaxIndex {
       }
       for (; i < end; i++) {
         final double v = column[base + i];
-        if (v < lo) lo = v;
-        if (v > hi) hi = v;
+        if (v < lo && v != double.negativeInfinity) lo = v;
+        if (v > hi && v != double.infinity) hi = v;
       }
     }
     return (lo, hi);

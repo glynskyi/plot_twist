@@ -49,6 +49,9 @@ class BarSeries extends StatelessWidget {
   final int? baseColumn;
 
   /// The value bars grow from when [baseColumn] is null.
+  ///
+  /// On a scale that cannot show this value, such as zero on a logarithmic
+  /// scale, bars grow from the edge of the plot.
   final double baseline;
 
   /// Identifier of the series.
@@ -217,14 +220,21 @@ class BarSeriesPainter extends ChartSeriesPainter {
         overscan: 0,
       );
     }
-    ChartRange? y = data.valueExtent(column: column, start: start, end: end);
+    ChartRange? y = data.valueExtent(column: column, start: start, end: end, within: yWindow);
     final int? base = baseColumn;
     if (base == null) {
-      y = y?.include(baseline);
+      // A baseline the scale cannot show (zero on a logarithmic scale) does
+      // not count; the bars are then drawn from the edge of the plot.
+      if (yWindow?.contains(baseline) ?? true) y = y?.include(baseline);
     } else {
-      y = ChartRange.merge(y, data.valueExtent(column: base, start: start, end: end));
+      y = ChartRange.merge(
+        y,
+        data.valueExtent(column: base, start: start, end: end, within: yWindow),
+      );
     }
-    final ChartRange? x = data.xExtent;
+    final ChartRange? x = xWindow == null
+        ? data.xExtent
+        : data.xExtentWithin(xWindow.shift(-offset));
     return ChartDataBounds(
       x: x == null ? null : ChartRange(x.min + offset - half, x.max + offset + half),
       y: y,
@@ -251,12 +261,9 @@ class BarSeriesPainter extends ChartSeriesPainter {
     final int i = data.nearestIndex(xs.toValue(query.position.dx) - offset);
     if (i < 0) return;
     final double y = data.value(i, column);
-    if (y.isNaN) return;
+    final Rect? rect = _rectOf(i, y, xs, ys, _half);
+    if (rect == null) return;
     final double x = data.x(i) + offset;
-    final Rect rect = Rect.fromPoints(
-      Offset(xs.toPixel(x - _half), ys.toPixel(_base(i))),
-      Offset(xs.toPixel(x + _half), ys.toPixel(y)),
-    );
     final Offset position = Offset(xs.toPixel(x), ys.toPixel(y));
     final double distance = query.mode == ChartHitMode.nearestX
         ? math.max(0, (query.position.dx - rect.center.dx).abs() - rect.width / 2)
@@ -265,6 +272,24 @@ class BarSeriesPainter extends ChartSeriesPainter {
     hits.add(
       ChartHit(x: data.x(i), y: y, position: position, distance: distance, index: i, rect: rect),
     );
+  }
+
+  // A pixel coordinate kept within reach of the plot. A value the scale
+  // cannot show, such as zero on a logarithmic scale, maps to infinity; it is
+  // drawn at the edge it lies beyond.
+  static double _near(double pixel, double extent) => pixel.clamp(-extent, extent * 2);
+
+  // The rectangle of the bar in row [i] with the value [y], or null when the
+  // row is a gap: a missing value or base, or a value the scale cannot show.
+  Rect? _rectOf(int i, double y, ChartScaleView xs, ChartScaleView ys, double half) {
+    final double top = ys.toPixel(y);
+    final double base = _near(ys.toPixel(_base(i)), ys.extent);
+    if (!top.isFinite || base.isNaN) return null;
+    final double x = data.x(i) + offset;
+    final double left = _near(xs.toPixel(x - half), xs.extent);
+    final double right = _near(xs.toPixel(x + half), xs.extent);
+    if (left.isNaN || right.isNaN) return null;
+    return Rect.fromPoints(Offset(left, base), Offset(right, top));
   }
 
   @override
@@ -291,7 +316,7 @@ class BarSeriesPainter extends ChartSeriesPainter {
 
     if (barPixels < 1 && data.isSorted && colorOf == null && baseColumn == null) {
       // More bars than pixels: one column per pixel covering the extremes.
-      final double base = ys.toPixel(baseline);
+      final double base = _near(ys.toPixel(baseline), ys.extent);
       final ui.Path path = pathFor(color);
       final bool ascending = xs.toPixel(xs.max) >= xs.toPixel(xs.min);
       int row = start;
@@ -302,8 +327,10 @@ class BarSeriesPainter extends ChartSeriesPainter {
         final (double lo, double hi) = data.minMax(row, rowEnd, column: column);
         if (lo <= hi) {
           final double left = ascending ? k.toDouble() : xs.extent - (k + 1.0);
-          final double top = math.min(base, math.min(ys.toPixel(lo), ys.toPixel(hi)));
-          final double bottom = math.max(base, math.max(ys.toPixel(lo), ys.toPixel(hi)));
+          final double low = _near(ys.toPixel(lo), ys.extent);
+          final double high = _near(ys.toPixel(hi), ys.extent);
+          final double top = math.min(base, math.min(low, high));
+          final double bottom = math.max(base, math.max(low, high));
           path.addRect(Rect.fromLTRB(left, top, left + 1, bottom));
         }
         row = rowEnd;
@@ -312,18 +339,12 @@ class BarSeriesPainter extends ChartSeriesPainter {
       final double r = math.min(radius, barPixels / 2);
       for (int i = start; i < end; i++) {
         final double y = data.value(i, column);
-        if (y.isNaN) continue;
-        final double x = data.x(i) + offset;
-        final double baseValue = _base(i);
-        if (baseValue.isNaN) continue;
-        final Rect rect = Rect.fromPoints(
-          Offset(xs.toPixel(x - half), ys.toPixel(baseValue)),
-          Offset(xs.toPixel(x + half), ys.toPixel(y)),
-        );
+        final Rect? rect = _rectOf(i, y, xs, ys, half);
+        if (rect == null) continue;
         final ui.Path path = pathFor(colorOf?.call(i, data.x(i), y) ?? color);
         if (r > 0) {
           // Round only the end that points away from the base.
-          final bool up = ys.toPixel(y) <= ys.toPixel(baseValue);
+          final bool up = ys.toPixel(y) <= rect.center.dy;
           final Radius corner = Radius.circular(math.min(r, rect.height));
           path.addRRect(
             RRect.fromRectAndCorners(

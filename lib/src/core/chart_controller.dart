@@ -131,16 +131,29 @@ class ChartController {
     return controller;
   }
 
-  ChartRange? _extentFor(ChartScaleController controller, {required bool visibleOnly}) {
+  // The extent of the series on [controller]'s scale. With [visibleOnly],
+  // only what the other scale of each series shows counts; with [within],
+  // only data inside that range of this scale does.
+  ChartRange? _extentFor(
+    ChartScaleController controller, {
+    required bool visibleOnly,
+    ChartRange? within,
+  }) {
     ChartRange? result;
     for (final ChartSeries series in _series) {
       final ChartScaleController xs = scale(series.xScale);
       final ChartScaleController ys = scale(series.yScale);
       if (identical(ys, controller)) {
-        result = ChartRange.merge(result, series.bounds(xWindow: visibleOnly ? xs.range : null)?.y);
+        result = ChartRange.merge(
+          result,
+          series.bounds(xWindow: visibleOnly ? xs.range : null, yWindow: within)?.y,
+        );
       }
       if (identical(xs, controller)) {
-        result = ChartRange.merge(result, series.bounds(yWindow: visibleOnly ? ys.range : null)?.x);
+        result = ChartRange.merge(
+          result,
+          series.bounds(xWindow: within, yWindow: visibleOnly ? ys.range : null)?.x,
+        );
       }
     }
     return result;

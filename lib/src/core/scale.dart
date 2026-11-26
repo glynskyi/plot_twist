@@ -16,6 +16,11 @@ abstract class ChartRangeContext {
   /// With [visibleOnly], only data inside the visible windows of the other
   /// scales is considered — this is what makes "fit Y to the visible X range"
   /// work.
+  ///
+  /// Data outside the scale's [ChartScale.domain] does not count. Where some
+  /// was left out, the extent reaches to the next whole unit of scale space
+  /// on that side (the next power of the base on a logarithmic scale), so a
+  /// bar that grows from such a value still has a length.
   ChartRange? dataExtent({bool visibleOnly = false});
 }
 
@@ -67,7 +72,9 @@ ChartRange _fit(
 }) {
   if (extent == null || !extent.isFinite) return fallback;
   final ChartScale scale = context.scale;
-  final ChartRange data = includeZero ? extent.include(0) : extent;
+  // A scale that cannot show zero (a logarithmic one) cannot include it.
+  final bool withZero = includeZero && (scale.domain?.contains(0) ?? true);
+  final ChartRange data = withZero ? extent.include(0) : extent;
   double lo = scale.transform(data.min);
   double hi = scale.transform(data.max);
   if (!lo.isFinite || !hi.isFinite) return fallback;
@@ -79,8 +86,8 @@ ChartRange _fit(
   final double pad = (hi - lo) * padding;
   // When zero was added as a baseline, things should sit on it: no padding
   // on that side.
-  final bool restsOnZero = includeZero && extent.min >= 0;
-  final bool hangsFromZero = includeZero && extent.max <= 0;
+  final bool restsOnZero = withZero && extent.min >= 0;
+  final bool hangsFromZero = withZero && extent.max <= 0;
   final double min = restsOnZero ? data.min : scale.invert(lo - pad) - margin;
   final double max = hangsFromZero ? data.max : scale.invert(hi + pad) + margin;
   return max > min ? ChartRange(min, max) : fallback;
@@ -361,6 +368,16 @@ abstract class ChartScale {
   /// [ticks] or, if null, [defaultTicks].
   ChartTicks get effectiveTicks => ticks ?? defaultTicks;
 
+  /// The values this scale can show, or null when it can show every value.
+  ///
+  /// Data outside the domain is treated as missing: automatic ranges leave
+  /// it out, lines break there, and a bar or filled area whose base lies
+  /// outside is drawn from the edge of the plot.
+  ///
+  /// Override this in a custom scale whose [transform] is not finite for
+  /// every value.
+  ChartRange? get domain => null;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -390,13 +407,20 @@ class LinearScale extends ChartScale {
   ChartTicks get defaultTicks => const LinearTicks();
 }
 
-/// A logarithmic scale. Values must be positive.
+/// A logarithmic scale.
+///
+/// Only positive values have a place on it. Zero and negative values are
+/// treated as missing data (see [domain]), so a bar series with its default
+/// baseline of 0 grows from the edge of the plot.
 class LogScale extends ChartScale {
   /// Creates a logarithmic scale.
   const LogScale({this.base = 10, super.range, super.limits, super.ticks, super.reversed});
 
   /// The logarithm base.
   final double base;
+
+  @override
+  ChartRange? get domain => const ChartRange(double.minPositive, double.infinity);
 
   @override
   double transform(double value) =>

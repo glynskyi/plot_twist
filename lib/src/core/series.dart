@@ -159,7 +159,8 @@ abstract class ChartSeries {
   /// The data extent of the series.
   ///
   /// With [xWindow] (or [yWindow]) only data inside that window counts; this
-  /// is how a scale fits itself to what is visible.
+  /// is how a scale fits itself to what is visible, and how a scale that
+  /// cannot show every value leaves out the rest.
   ChartDataBounds? bounds({ChartRange? xWindow, ChartRange? yWindow});
 
   /// The y value of the drawn series at [x], interpolated the same way it is

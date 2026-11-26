@@ -9,10 +9,15 @@ import 'package:flutter/scheduler.dart';
 import 'range.dart';
 import 'scale.dart';
 
-/// Supplies the extent of data plotted on a scale.
+/// Supplies the extent of data plotted on a scale. With [within], only data
+/// inside that range of the scale counts.
 @internal
 typedef ChartExtentSource =
-    ChartRange? Function(ChartScaleController scale, {required bool visibleOnly});
+    ChartRange? Function(
+      ChartScaleController scale, {
+      required bool visibleOnly,
+      ChartRange? within,
+    });
 
 /// The live state of one scale: which window is visible.
 ///
@@ -74,9 +79,50 @@ class ChartScaleController extends ChangeNotifier implements ChartRangeContext {
 
   @override
   ChartRange? dataExtent({bool visibleOnly = false}) {
+    final ChartRange? all = _sourceExtent(visibleOnly, null);
+    final ChartRange? domain = _scale.domain;
+    if (all == null || domain == null) return all;
+    final bool below = all.min < domain.min;
+    final bool above = all.max > domain.max;
+    if (!below && !above) return all;
+
+    // Some of the data has no place on this scale. Fit what does.
+    final ChartRange? shown = _sourceExtent(visibleOnly, domain);
+    if (shown == null) return null;
+    // A series that does not narrow its bounds to the window still reports
+    // values outside it. That end is then unknown.
+    final double? lo = shown.min >= domain.min ? _scale.transform(shown.min) : null;
+    final double? hi = shown.max <= domain.max ? _scale.transform(shown.max) : null;
+    if (lo == null && hi == null) return null;
+    if ((lo != null && !lo.isFinite) || (hi != null && !hi.isFinite)) return null;
+    // What was left out, such as the zero that bars grow from, lay further
+    // out. Reach to the next whole unit of scale space on that side (the next
+    // power of the base on a logarithmic scale), so the marks next to it keep
+    // a length. An unknown end is put three units from the other one.
+    final double newLo = lo == null ? _wholeAbove(hi!) - 3 : (below ? _wholeBelow(lo) : lo);
+    final double newHi = hi == null ? _wholeBelow(lo!) + 3 : (above ? _wholeAbove(hi) : hi);
+    return ChartRange(
+      lo != null && !below ? shown.min : _scale.invert(newLo),
+      hi != null && !above ? shown.max : _scale.invert(newHi),
+    );
+  }
+
+  // The closest whole number below [v]. A value within rounding distance of
+  // a whole number counts as that number.
+  static double _wholeBelow(double v) {
+    final double nearest = v.roundToDouble();
+    return (v - nearest).abs() < 1e-9 ? nearest - 1 : v.floorToDouble();
+  }
+
+  static double _wholeAbove(double v) {
+    final double nearest = v.roundToDouble();
+    return (v - nearest).abs() < 1e-9 ? nearest + 1 : v.ceilToDouble();
+  }
+
+  ChartRange? _sourceExtent(bool visibleOnly, ChartRange? within) {
     ChartRange? result;
     for (final ChartExtentSource source in _sources) {
-      result = ChartRange.merge(result, source(this, visibleOnly: visibleOnly));
+      result = ChartRange.merge(result, source(this, visibleOnly: visibleOnly, within: within));
     }
     return result;
   }

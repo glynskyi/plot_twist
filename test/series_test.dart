@@ -307,22 +307,223 @@ void main() {
     });
   });
 
+  group('values a scale cannot show', () {
+    testWidgets('bars on a log scale fit their values and grow from the plot edge', (
+      WidgetTester tester,
+    ) async {
+      final ChartController c = ChartController();
+      addTearDown(c.dispose);
+      final ChartData data = ChartData.fromValues(<double>[5, 50, 500]);
+      await tester.pumpWidget(
+        host(
+          Chart(
+            controller: c,
+            y: const LogScale(),
+            children: <Widget>[BarSeries(data: data)],
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      // The baseline 0 has no place on a log scale. The window reaches down
+      // to the power of ten below the smallest bar, so that bar has a length.
+      expect(c.y.min, moreOrLessEquals(1, epsilon: 1e-9));
+      expect(c.y.max, moreOrLessEquals(500, epsilon: 1e-9));
+
+      final ChartView view = c.view!;
+      final ui.Path path = _paths(_painter<BarSeriesPainter>(tester), view).single;
+      expect(path.getBounds().isFinite, isTrue);
+      expect(path.computeMetrics().length, 3);
+      // Every bar reaches the bottom of the plot.
+      for (int i = 0; i < 3; i++) {
+        expect(path.contains(Offset(view.x.toPixel(i.toDouble()), view.size.height - 0.5)), isTrue);
+      }
+      expect(path.contains(view.toPixel(0, 3)), isTrue);
+      expect(path.contains(view.toPixel(0, 8)), isFalse);
+
+      final ChartHit hit = c.hitTest(view.toPixel(1, 2)).single;
+      expect(hit.y, 50);
+      expect(hit.rect!.isFinite, isTrue);
+      expect(hit.rect!.bottom, greaterThanOrEqualTo(view.size.height));
+
+      // The range follows the data.
+      data.add(3, 0.02);
+      await tester.pump();
+      expect(c.y.min, moreOrLessEquals(0.01, epsilon: 1e-9));
+    });
+
+    testWidgets('a zero on a log scale is a gap in the line, not a stuck window', (
+      WidgetTester tester,
+    ) async {
+      final ChartController c = ChartController();
+      addTearDown(c.dispose);
+      final ChartData data = ChartData.fromValues(<double>[20, 200, 0, 2000, 200]);
+      await tester.pumpWidget(
+        host(
+          Chart(
+            controller: c,
+            y: const LogScale(),
+            children: <Widget>[LineSeries(data: data, fillColor: _black, baseline: 0)],
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      expect(c.y.min, moreOrLessEquals(10, epsilon: 1e-9));
+      expect(c.y.max, moreOrLessEquals(2000, epsilon: 1e-6));
+
+      final ChartView view = c.view!;
+      final List<ui.Path> paths = _paths(_painter<LineSeriesPainter>(tester), view);
+      expect(paths, hasLength(2), reason: 'a fill and a stroke');
+      for (final ui.Path path in paths) {
+        expect(path.getBounds().isFinite, isTrue);
+        expect(path.computeMetrics().length, 2, reason: 'one piece on each side of the zero');
+      }
+      // Pointing at the zero finds no point there.
+      final List<ChartHit> hits = c.hitTest(Offset(view.x.toPixel(2), 100), maxDistance: 5);
+      expect(hits, isEmpty);
+    });
+
+    testWidgets('includeZero is ignored where zero cannot be shown', (WidgetTester tester) async {
+      final ChartController c = ChartController();
+      addTearDown(c.dispose);
+      final ChartData data = ChartData.fromValues(<double>[5, 500]);
+      await tester.pumpWidget(
+        host(
+          Chart(
+            controller: c,
+            y: const LogScale(range: FitDataRange(includeZero: true)),
+            children: <Widget>[LineSeries(data: data)],
+          ),
+        ),
+      );
+      expect(c.y.min, moreOrLessEquals(5, epsilon: 1e-9));
+      expect(c.y.max, moreOrLessEquals(500, epsilon: 1e-9));
+    });
+
+    testWidgets('a log x scale leaves out points at or below zero', (WidgetTester tester) async {
+      final ChartController c = ChartController();
+      addTearDown(c.dispose);
+      final ChartData data = ChartData.fromXY(<double>[-3, 0, 2, 20, 200], <double>[1, 2, 3, 4, 5]);
+      await tester.pumpWidget(
+        host(
+          Chart(
+            controller: c,
+            x: const LogScale(),
+            children: <Widget>[ScatterSeries(data: data)],
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      expect(c.x.min, moreOrLessEquals(1, epsilon: 1e-9));
+      expect(c.x.max, moreOrLessEquals(200, epsilon: 1e-9));
+      final ChartView view = c.view!;
+      final List<ChartHit> hits = c.hitTest(const Offset(0, 150), mode: ChartHitMode.nearest);
+      expect(hits.single.x, 2, reason: 'the points at -3 and 0 are not on the chart');
+      expect(hits.single.position.isFinite, isTrue);
+      expect(view.x.toPixel(2), greaterThan(0));
+    });
+
+    testWidgets('data with nothing a log scale can show throws nothing', (
+      WidgetTester tester,
+    ) async {
+      final ChartController c = ChartController();
+      addTearDown(c.dispose);
+      final ChartData data = ChartData.fromValues(<double>[0, -5, -50]);
+      await tester.pumpWidget(_full(c, BarSeries(data: data)));
+      await tester.pumpWidget(
+        host(
+          Chart(
+            controller: c,
+            y: const LogScale(),
+            left: const <Widget>[ChartAxis()],
+            children: <Widget>[
+              const ChartGrid(),
+              BarSeries(data: data),
+              LineSeries(data: data),
+              ScatterSeries(data: data),
+              const ChartCrosshair(),
+              const ChartTooltip(),
+            ],
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      expect(c.y.min, greaterThan(0));
+      expect(c.y.range.isFinite, isTrue);
+      for (final ChartSeriesPainter painter
+          in tester
+              .widgetList<ChartPaint>(find.byType(ChartPaint))
+              .map((ChartPaint paint) => paint.painter)
+              .whereType<ChartSeriesPainter>()) {
+        for (final ui.Path path in _paths(painter, c.view!)) {
+          expect(path.getBounds().isFinite || path.getBounds().isEmpty, isTrue);
+        }
+      }
+      expect(c.hitTest(const Offset(100, 100)), isEmpty);
+    });
+
+    testWidgets('an infinite value is a gap and does not stretch the range', (
+      WidgetTester tester,
+    ) async {
+      final ChartController c = ChartController();
+      addTearDown(c.dispose);
+      final ChartData data = ChartData.fromValues(<double>[
+        10,
+        20,
+        double.infinity,
+        40,
+        double.negativeInfinity,
+        30,
+        50,
+      ]);
+      await tester.pumpWidget(
+        host(
+          Chart(
+            controller: c,
+            children: <Widget>[
+              LineSeries(data: data),
+              BarSeries(data: data),
+              ScatterSeries(data: data),
+            ],
+          ),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      expect(c.y.range, const ChartRange(0, 50));
+      final ChartView view = c.view!;
+      final ui.Path line = _paths(_painter<LineSeriesPainter>(tester), view).single;
+      expect(line.getBounds().isFinite, isTrue);
+      expect(line.computeMetrics().length, 3);
+      final ui.Path bars = _paths(_painter<BarSeriesPainter>(tester), view).single;
+      expect(bars.getBounds().isFinite, isTrue);
+      expect(bars.computeMetrics().length, 5);
+      for (final ChartHit hit in c.hitTest(Offset(view.x.toPixel(2), 100))) {
+        expect(hit.position.isFinite, isTrue);
+        expect(hit.y.isFinite, isTrue);
+      }
+    });
+  });
+
   group('ScatterSeries', () {
-    test('with unsorted points, each window restricts the other dimension', () {
+    test('with unsorted points, only the rows inside a window count', () {
       final ChartData data = ChartData.fromXY(<double>[5, 1, 9, 3], <double>[10, 40, 20, 30]);
       addTearDown(data.dispose);
       expect(data.isSorted, isFalse);
       final ScatterSeriesPainter painter = ScatterSeriesPainter(data: data, color: _black);
       expect(painter.bounds(), const ChartDataBounds(x: ChartRange(1, 9), y: ChartRange(10, 40)));
-      // Rows with x in 0..4 have the values 40 and 30.
+      // The rows with x in 0..4 are (1, 40) and (3, 30).
       expect(
         painter.bounds(xWindow: const ChartRange(0, 4)),
-        const ChartDataBounds(x: ChartRange(1, 9), y: ChartRange(30, 40)),
+        const ChartDataBounds(x: ChartRange(1, 3), y: ChartRange(30, 40)),
       );
-      // Rows with a value in 0..25 sit at x = 5 and x = 9.
+      // The rows with a value in 0..25 are (5, 10) and (9, 20).
       expect(
         painter.bounds(yWindow: const ChartRange(0, 25)),
-        const ChartDataBounds(x: ChartRange(5, 9), y: ChartRange(10, 40)),
+        const ChartDataBounds(x: ChartRange(5, 9), y: ChartRange(10, 20)),
+      );
+      // Only (9, 20) is inside both.
+      expect(
+        painter.bounds(xWindow: const ChartRange(6, 10), yWindow: const ChartRange(0, 25)),
+        const ChartDataBounds(x: ChartRange(9, 9), y: ChartRange(20, 20)),
       );
     });
 

@@ -230,18 +230,22 @@ class LineSeriesPainter extends ChartSeriesPainter {
     ChartRange? y;
     if (xWindow != null && data.isSorted) {
       final (int start, int end) = data.indexRange(xWindow.min, xWindow.max, overscan: 0);
-      y = data.valueExtent(column: column, start: start, end: end);
+      y = data.valueExtent(column: column, start: start, end: end, within: yWindow);
       // The line also shows where it crosses the edges of the window.
       for (final double edge in <double>[xWindow.min, xWindow.max]) {
         final double? v = valueAt(edge);
-        if (v != null) y = y == null ? ChartRange(v, v) : y.include(v);
+        if (v != null && v.isFinite && (yWindow?.contains(v) ?? true)) {
+          y = y == null ? ChartRange(v, v) : y.include(v);
+        }
       }
     } else {
-      y = data.valueExtent(column: column);
+      y = data.valueExtent(column: column, within: yWindow);
     }
     final double? base = baseline;
-    if (y != null && _hasFill && base != null) y = y.include(base);
-    return ChartDataBounds(x: data.xExtent, y: y);
+    if (y != null && _hasFill && base != null && (yWindow?.contains(base) ?? true)) {
+      y = y.include(base);
+    }
+    return ChartDataBounds(x: xWindow == null ? data.xExtent : data.xExtentWithin(xWindow), y: y);
   }
 
   @override
@@ -335,6 +339,8 @@ class LineSeriesPainter extends ChartSeriesPainter {
       final double y = data.value(i, column);
       if (y.isNaN) return null;
       final Offset position = Offset(xs.toPixel(x), ys.toPixel(y));
+      // A value the scale cannot show is not on the chart.
+      if (!position.isFinite) return null;
       final double distance = query.mode == ChartHitMode.nearestX
           ? (position.dx - query.position.dx).abs()
           : (position - query.position).distance;
@@ -392,7 +398,10 @@ class LineSeriesPainter extends ChartSeriesPainter {
     final Rect plot = Offset.zero & view.size;
 
     if (_hasFill) {
-      final double base = baseline == null ? view.size.height : ys.toPixel(baseline!);
+      // A base the scale cannot show is the edge of the plot.
+      final double base = baseline == null
+          ? view.size.height
+          : ys.toPixel(baseline!).clamp(-ys.extent, ys.extent * 2);
       final ui.Path fill = ui.Path();
       line.forEachSegment((int from, int to) {
         if (to - from < 2) return;
@@ -458,13 +467,24 @@ class LineSeriesPainter extends ChartSeriesPainter {
 
   void _collectAll(_Polyline out, ChartScaleView xs, ChartScaleView ys, int start, int end) {
     for (int i = start; i < end; i++) {
-      final double v = data.value(i, column);
-      if (v.isNaN) {
-        out.breakSegment();
-      } else {
-        out.add(xs.toPixel(data.x(i)), ys.toPixel(v));
+      _addRow(out, xs, ys, i);
+    }
+  }
+
+  // Adds row [i] to the line, or breaks the line there when the row is a gap:
+  // a missing value, or one that the scales cannot show (an infinite value,
+  // or zero on a logarithmic scale).
+  void _addRow(_Polyline out, ChartScaleView xs, ChartScaleView ys, int i) {
+    final double v = data.value(i, column);
+    if (!v.isNaN) {
+      final double px = xs.toPixel(data.x(i));
+      final double py = ys.toPixel(v);
+      if (px.isFinite && py.isFinite) {
+        out.add(px, py);
+        return;
       }
     }
+    out.breakSegment();
   }
 
   // Reduces each half-pixel sliver of the plot to its first, lowest, highest
@@ -481,14 +501,12 @@ class LineSeriesPainter extends ChartSeriesPainter {
 
     void raw(int from, int to) {
       for (int i = from; i < to; i++) {
-        final double v = data.value(i, column);
-        if (v.isNaN) {
-          out.breakSegment();
-        } else {
-          out.add(xs.toPixel(data.x(i)), ys.toPixel(v));
-        }
+        _addRow(out, xs, ys, i);
       }
     }
+
+    // Values the y scale cannot show are drawn at the edge they lie beyond.
+    double py(double v) => ys.toPixel(v).clamp(-ys.extent, ys.extent * 2);
 
     int row = start;
     final int firstVisible = math.min(end, math.max(start, data.lowerBound(xs.min)));
@@ -515,14 +533,14 @@ class LineSeriesPainter extends ChartSeriesPainter {
           final double first = data.value(row, column);
           final double last = data.value(rowEnd - 1, column);
           final bool lowFirst = first.isNaN || (first - lo).abs() <= (first - hi).abs();
-          final double near = ys.toPixel(lowFirst ? lo : hi);
-          final double far = ys.toPixel(lowFirst ? hi : lo);
-          if (!first.isNaN) out.add(px0, ys.toPixel(first));
+          final double near = py(lowFirst ? lo : hi);
+          final double far = py(lowFirst ? hi : lo);
+          if (first.isFinite) out.add(px0, py(first));
           out.add(px0, near);
           out.add(px0, far);
           out.add(px1, far);
           out.add(px1, near);
-          if (!last.isNaN) out.add(px1, ys.toPixel(last));
+          if (last.isFinite) out.add(px1, py(last));
         }
       }
       row = rowEnd;
