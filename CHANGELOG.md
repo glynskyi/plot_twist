@@ -15,8 +15,24 @@ The old names keep working and are marked as deprecated. They are removed in
 
 The painters of the three series are renamed in the same way.
 
+### Changed
+
+- A series without a `color` takes the colour the palette of the chart theme
+  has for its place in the chart: the first series the first colour, the
+  second the next, whether a series is visible or not. Until now every such
+  series took the first colour, so a chart with several of them changes its
+  colours. Give a series a `color` to keep it.
+- `ChartController.series` lists the series in paint order. A series added in
+  front of others on a rebuild used to come last.
+- `ChartSeries.color` of a series without a colour is its palette colour, also
+  for a `ChartPaint` with a painter of your own, where it used to be null.
+- `color` of `LineSeriesPainter`, `BarSeriesPainter` and `ScatterSeriesPainter`
+  is optional and nullable. Null paints with `ChartPaintContext.seriesColor`.
+
 ### New
 
+- `ChartPaintContext.seriesColor`: the colour of the layer being painted, for
+  painters of your own.
 - `clip` on `BarSeries`, `ScatterSeries` and `CandlestickSeries`, as on
   `LineSeries`.
 

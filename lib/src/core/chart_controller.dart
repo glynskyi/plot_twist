@@ -98,6 +98,7 @@ class ChartController {
   final bool _ownsFocus;
   ChartView? _view;
   bool _propagating = false;
+  bool _seriesOrderDirty = false;
   int _revision = 0;
   bool _disposed = false;
 
@@ -186,9 +187,11 @@ class ChartController {
 
   // ---------------------------------------------------------------- series
 
-  /// The series currently in the chart, in the order they were added to it.
+  /// The series currently in the chart, in the order they are painted:
+  /// the first one is at the bottom.
   ///
-  /// A series added on a rebuild comes last, wherever it is painted.
+  /// The order is settled by the layout of the chart. Until then, a series
+  /// added on a rebuild comes last.
   List<ChartSeries> get series => List<ChartSeries>.unmodifiable(_series);
 
   /// Notifies when series are added, removed or change their data or metadata.
@@ -210,14 +213,52 @@ class ChartController {
   @internal
   void registerSeries(ChartSeries series) {
     _series.add(series);
+    _seriesOrderDirty = true;
     _seriesChanged();
   }
 
   /// Removes [series] from the registry.
   @internal
   void unregisterSeries(ChartSeries series) {
-    if (_series.remove(series)) _seriesChanged();
+    if (!_series.remove(series)) return;
+    _seriesOrderDirty = true;
+    _seriesChanged();
   }
+
+  /// Whether series came or went since [orderSeries] was last called.
+  @internal
+  bool get seriesOrderDirty => _seriesOrderDirty;
+
+  /// Puts the registered series into the order of [painted], which lists
+  /// them as they are painted. Returns whether a series changed its place.
+  @internal
+  bool orderSeries(List<ChartSeries> painted) {
+    _seriesOrderDirty = false;
+    final Set<ChartSeries> registered = Set<ChartSeries>.identity()..addAll(_series);
+    final Set<ChartSeries> placed = Set<ChartSeries>.identity();
+    final List<ChartSeries> next = <ChartSeries>[
+      for (final ChartSeries s in painted)
+        if (registered.contains(s) && placed.add(s)) s,
+    ];
+    // A series the chart did not find keeps its place after the others.
+    for (final ChartSeries s in _series) {
+      if (!placed.contains(s)) next.add(s);
+    }
+    bool moved = false;
+    for (int i = 0; i < next.length && !moved; i++) {
+      moved = !identical(next[i], _series[i]);
+    }
+    if (!moved) return false;
+    _series
+      ..clear()
+      ..addAll(next);
+    _seriesNotifier.notify();
+    return true;
+  }
+
+  /// The place of [series] in [ChartController.series], or -1.
+  @internal
+  int seriesIndex(ChartSeries series) => _series.indexOf(series);
 
   /// Reports that the data or metadata of [series] changed.
   @internal

@@ -596,7 +596,9 @@ planned for this demo was dropped to keep the file under the line limit.
 
 **In plot_twist.** `LineSeries(shader: (view) => …)` builds a shader from the
 current view, so gradient stops can be data values. `dash:` draws a dashed
-line. `BarSeries(colorOf: …)` colours single bars. Without a `ChartTheme`,
+line. `BarSeries(colorOf: …)` colours single bars. A series without a `color`
+takes the colour the theme's palette has for its place in the chart: the
+first series the first colour, the second the next. Without a `ChartTheme`,
 charts take their colours from the ambient `DefaultTextStyle`, so they follow
 light and dark themes; `ChartTheme` overrides them.
 

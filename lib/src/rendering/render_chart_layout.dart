@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import '../core/chart_controller.dart';
 import '../core/chart_view.dart';
 import '../core/scale_controller.dart';
+import '../core/series.dart';
 import '../interaction/pointer_hub.dart';
 import 'view_channel.dart';
 
@@ -254,7 +255,28 @@ class RenderChartLayout extends RenderBox
     } finally {
       _layoutDepth--;
     }
+    if (_controller.seriesOrderDirty) _orderSeries();
     _controller.commitView(_channel.view);
+  }
+
+  // Series register as they are attached, which after a rebuild is not the
+  // order they are painted in. Paint order is the order a legend lists them
+  // in, and it gives a series without a colour its place in the palette.
+  void _orderSeries() {
+    final List<ChartSeries> painted = <ChartSeries>[];
+    void visit(RenderObject object) {
+      // A chart inside this one has its own series.
+      if (object is RenderChartLayout) return;
+      if (object is ChartSeries) painted.add(object as ChartSeries);
+      object.visitChildren(visit);
+    }
+
+    visitChildren(visit);
+    if (!_controller.orderSeries(painted)) return;
+    // Their palette colours may have changed.
+    for (final ChartSeries series in painted) {
+      (series as RenderObject).markNeedsPaint();
+    }
   }
 
   void _layoutChildren() {

@@ -44,7 +44,8 @@ class ScatterSeries extends StatelessWidget {
   /// Name of the series, for legends and tooltips.
   final String? label;
 
-  /// Dot colour. Defaults to the first palette colour of the chart theme.
+  /// Dot colour. Defaults to the colour the palette of the chart theme has
+  /// for the place of the series in the chart.
   final Color? color;
 
   /// Dot radius in logical pixels. Defaults to `3`.
@@ -71,11 +72,10 @@ class ScatterSeries extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color effectiveColor = color ?? ChartTheme.of(context).seriesColor(0);
     return ChartPaint(
       id: id,
       label: label,
-      color: effectiveColor,
+      color: color,
       visible: visible,
       clip: clip,
       isolate: isolate,
@@ -83,7 +83,7 @@ class ScatterSeries extends StatelessWidget {
         data: data,
         column: column,
         sizeColumn: sizeColumn,
-        color: effectiveColor,
+        color: color,
         pointRadius: pointRadius,
         xScale: xScale,
         yScale: yScale,
@@ -100,7 +100,7 @@ class ScatterSeriesPainter extends ChartSeriesPainter {
     required this.data,
     this.column = 0,
     this.sizeColumn,
-    required this.color,
+    this.color,
     double? pointRadius,
     super.xScale,
     super.yScale,
@@ -117,8 +117,8 @@ class ScatterSeriesPainter extends ChartSeriesPainter {
   /// The value column holding per-dot radii.
   final int? sizeColumn;
 
-  /// Dot colour.
-  final Color color;
+  /// Dot colour; null uses `ChartPaintContext.seriesColor`.
+  final Color? color;
 
   /// Dot radius in logical pixels.
   final double pointRadius;
@@ -227,6 +227,7 @@ class ScatterSeriesPainter extends ChartSeriesPainter {
     final double height = view.size.height;
     final int? sizes = sizeColumn;
     final double radius = pointRadius;
+    final Color color = this.color ?? context.seriesColor;
     if (sizes != null) {
       final Paint paint = Paint()..color = color;
       for (int i = start; i < end; i++) {

@@ -64,7 +64,8 @@ class LineSeries extends StatelessWidget {
   /// Name of the series, for legends and tooltips.
   final String? label;
 
-  /// Stroke colour. Defaults to the first palette colour of the chart theme.
+  /// Stroke colour. Defaults to the colour the palette of the chart theme
+  /// has for the place of the series in the chart.
   final Color? color;
 
   /// Stroke width in logical pixels. `0` draws no line.
@@ -113,18 +114,17 @@ class LineSeries extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color effectiveColor = color ?? ChartTheme.of(context).seriesColor(0);
     return ChartPaint(
       id: id,
       label: label,
-      color: effectiveColor,
+      color: color,
       visible: visible,
       clip: clip,
       isolate: isolate,
       painter: LineSeriesPainter(
         data: data,
         column: column,
-        color: effectiveColor,
+        color: color,
         width: width,
         curve: curve,
         dash: dash,
@@ -148,7 +148,7 @@ class LineSeriesPainter extends ChartSeriesPainter {
   LineSeriesPainter({
     required this.data,
     this.column = 0,
-    required this.color,
+    this.color,
     this.width = 2,
     this.curve = LineCurve.linear,
     this.dash,
@@ -168,8 +168,8 @@ class LineSeriesPainter extends ChartSeriesPainter {
   /// Which value column to plot.
   final int column;
 
-  /// Stroke colour.
-  final Color color;
+  /// Stroke colour; null uses `ChartPaintContext.seriesColor`.
+  final Color? color;
 
   /// Stroke width.
   final double width;
@@ -434,6 +434,7 @@ class LineSeriesPainter extends ChartSeriesPainter {
 
     final Canvas canvas = context.canvas;
     final Rect plot = Offset.zero & view.size;
+    final Color color = this.color ?? context.seriesColor;
 
     if (_hasFill) {
       // A base the scale cannot show is the edge of the plot.

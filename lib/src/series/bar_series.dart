@@ -64,7 +64,8 @@ class BarSeries extends StatelessWidget {
   /// Name of the series, for legends and tooltips.
   final String? label;
 
-  /// Bar colour. Defaults to the first palette colour of the chart theme.
+  /// Bar colour. Defaults to the colour the palette of the chart theme has
+  /// for the place of the series in the chart.
   final Color? color;
 
   /// Per-bar colour; return null to use [color].
@@ -109,11 +110,10 @@ class BarSeries extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color effectiveColor = color ?? ChartTheme.of(context).seriesColor(0);
     return ChartPaint(
       id: id,
       label: label,
-      color: effectiveColor,
+      color: color,
       visible: visible,
       clip: clip,
       isolate: isolate,
@@ -122,7 +122,7 @@ class BarSeries extends StatelessWidget {
         column: column,
         baseColumn: baseColumn,
         baseline: baseline,
-        color: effectiveColor,
+        color: color,
         colorOf: colorOf,
         widthFactor: widthFactor,
         step: step,
@@ -144,7 +144,7 @@ class BarSeriesPainter extends ChartSeriesPainter {
     this.column = 0,
     this.baseColumn,
     this.baseline = 0,
-    required this.color,
+    this.color,
     this.colorOf,
     double? widthFactor,
     this.step,
@@ -170,8 +170,8 @@ class BarSeriesPainter extends ChartSeriesPainter {
   /// The value bars grow from.
   final double baseline;
 
-  /// Bar colour.
-  final Color color;
+  /// Bar colour; null uses `ChartPaintContext.seriesColor`.
+  final Color? color;
 
   /// Per-bar colour.
   final ChartBarColor? colorOf;
@@ -338,6 +338,7 @@ class BarSeriesPainter extends ChartSeriesPainter {
         ? data.indexRange(xs.min - offset - half, xs.max - offset + half, overscan: 0)
         : (0, data.length);
     if (end <= start) return;
+    final Color color = this.color ?? context.seriesColor;
 
     final double barPixels = xs.lengthToPixels(half * 2, at: data.x(start));
     final Map<Color, ui.Path> paths = <Color, ui.Path>{};

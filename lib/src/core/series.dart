@@ -144,6 +144,9 @@ abstract class ChartSeries {
   String? get label;
 
   /// Representative colour, for legends and tooltips.
+  ///
+  /// A series that was given no colour reports the one it takes from the
+  /// palette of the chart theme.
   Color? get color;
 
   /// Whether the series is shown. A hidden series stays registered — so a

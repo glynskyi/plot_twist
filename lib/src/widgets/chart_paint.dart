@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
@@ -7,17 +8,24 @@ import '../core/range.dart';
 import '../core/series.dart';
 import '../rendering/view_channel.dart';
 import 'chart_scope.dart';
+import 'chart_theme.dart';
 
 /// What a [ChartPainter] paints with.
 class ChartPaintContext {
   /// Creates a paint context.
-  ChartPaintContext({required this.canvas, required this.view});
+  ChartPaintContext({required this.canvas, required this.view, Color? seriesColor})
+    : seriesColor = seriesColor ?? ChartThemeData.defaultPalette.first;
 
   /// The canvas, with its origin at the top-left corner of the plot.
   final Canvas canvas;
 
   /// The chart's view for this frame.
   final ChartView view;
+
+  /// The colour of the layer: the `color` of its [ChartPaint] or, without
+  /// one, the colour the palette of the chart theme has for the place of the
+  /// series in the chart.
+  final Color seriesColor;
 
   /// Size of the plot area.
   Size get size => view.size;
@@ -128,7 +136,12 @@ class ChartPaint extends LeafRenderObjectWidget {
   /// Name of the series, for legends and tooltips.
   final String? label;
 
-  /// Representative colour of the series, for legends and tooltips.
+  /// Colour of the series, for legends and tooltips.
+  ///
+  /// Null gives the series a colour from the palette of the chart theme: the
+  /// first series of a chart gets the first colour, the second the next, and
+  /// so on in paint order, whether a series is visible or not. The painter
+  /// reads the result from `ChartPaintContext.seriesColor`.
   final Color? color;
 
   /// Whether painting is clipped to the plot area.
@@ -148,6 +161,7 @@ class ChartPaint extends LeafRenderObjectWidget {
       id: id,
       label: label,
       color: color,
+      palette: ChartTheme.of(context).palette,
       visible: visible,
       clip: clip,
       isolate: isolate,
@@ -162,6 +176,7 @@ class ChartPaint extends LeafRenderObjectWidget {
       ..channel = scope.channel
       ..painter = painter
       ..setMetadata(id: id, label: label, color: color)
+      ..palette = ChartTheme.of(context).palette
       ..visible = visible
       ..clip = clip
       ..isolate = isolate;
@@ -178,6 +193,7 @@ class RenderChartPaint extends RenderBox with ChartViewDependent implements Char
     Object? id,
     String? label,
     Color? color,
+    List<Color> palette = ChartThemeData.defaultPalette,
     bool visible = true,
     bool clip = true,
     bool isolate = true,
@@ -186,6 +202,7 @@ class RenderChartPaint extends RenderBox with ChartViewDependent implements Char
        _id = id,
        _label = label,
        _color = color,
+       _palette = palette,
        _visible = visible,
        _clip = clip,
        _isolate = isolate {
@@ -240,10 +257,32 @@ class RenderChartPaint extends RenderBox with ChartViewDependent implements Char
   /// Updates the series metadata.
   void setMetadata({Object? id, String? label, Color? color}) {
     if (id == _id && label == _label && color == _color) return;
+    if (color != _color) markNeedsPaint();
     _id = id;
     _label = label;
     _color = color;
     if (attached && _painter is ChartSeriesPainter) _controller.seriesChanged(this);
+  }
+
+  /// The colours a layer without a colour of its own picks from.
+  List<Color> get palette => _palette;
+  List<Color> _palette;
+  set palette(List<Color> value) {
+    if (listEquals(value, _palette)) return;
+    _palette = value;
+    if (_color != null) return;
+    markNeedsPaint();
+    if (attached && _painter is ChartSeriesPainter) _controller.seriesChanged(this);
+  }
+
+  // The colour of the layer. Without one of its own it takes the palette
+  // colour for its place among the series of the chart.
+  Color get _effectiveColor {
+    final Color? own = _color;
+    if (own != null) return own;
+    if (_palette.isEmpty) return ChartThemeData.defaultPalette.first;
+    final int index = _painter is ChartSeriesPainter ? _controller.seriesIndex(this) : 0;
+    return _palette[(index < 0 ? 0 : index) % _palette.length];
   }
 
   @override
@@ -328,7 +367,7 @@ class RenderChartPaint extends RenderBox with ChartViewDependent implements Char
     canvas.save();
     canvas.translate(offset.dx, offset.dy);
     if (_clip) canvas.clipRect(Offset.zero & view.size);
-    _painter.paint(ChartPaintContext(canvas: canvas, view: view));
+    _painter.paint(ChartPaintContext(canvas: canvas, view: view, seriesColor: _effectiveColor));
     canvas.restore();
   }
 
@@ -341,7 +380,7 @@ class RenderChartPaint extends RenderBox with ChartViewDependent implements Char
   String? get label => _label;
 
   @override
-  Color? get color => _color;
+  Color? get color => _effectiveColor;
 
   @override
   Object get xScale => (_painter as ChartSeriesPainter).xScale;
