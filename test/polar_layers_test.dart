@@ -171,6 +171,29 @@ void main() {
     ) async {
       await tester.pumpWidget(chart(const ChartPolarAxis.angle(style: _style, inside: true)));
       expect(_drawn(tester, ChartPolarAxis).texts.first, _at(195, 36));
+      // In a chart with a hole they stand inside the ring: here it starts 60
+      // px from the centre.
+      await tester.pumpWidget(
+        host(
+          PolarChart(
+            angle: _four,
+            radius: _ten,
+            innerRadius: 0.5,
+            margin: const EdgeInsets.all(30),
+            children: <Widget>[
+              _fourBands(),
+              const ChartPolarAxis.angle(style: _style, inside: true, tickLength: 4),
+            ],
+          ),
+        ),
+      );
+      final ({List<Offset> texts, List<(Offset, Offset)> lines}) ring = _drawn(
+        tester,
+        ChartPolarAxis,
+      );
+      expect(ring.lines.first.$1, within<Offset>(distance: 1e-6, from: const Offset(200, 90)));
+      expect(ring.lines.first.$2, within<Offset>(distance: 1e-6, from: const Offset(200, 94)));
+      expect(ring.texts.first, _at(195, 100));
 
       await tester.pumpWidget(chart(const ChartPolarAxis.angle(style: _style, tickLength: 8)));
       ({List<Offset> texts, List<(Offset, Offset)> lines}) drawn = _drawn(tester, ChartPolarAxis);

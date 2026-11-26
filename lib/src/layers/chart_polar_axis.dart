@@ -23,8 +23,10 @@ import '../../plot_twist.dart';
 class ChartPolarAxis extends StatelessWidget {
   /// Labels around the circle, at the ticks of the angle scale.
   ///
-  /// They stand outside the circle, [padding] away from it, or inside it
-  /// with [inside]. A [tickLength] draws a short mark at each tick.
+  /// They stand outside the circle, [padding] away from it. With [inside]
+  /// they stand inside it: within the inner radius of a chart that has one,
+  /// so they clear the ring of a gauge, and else within the circle. A
+  /// [tickLength] draws a short mark at each tick, on the same side.
   const ChartPolarAxis.angle({
     super.key,
     this.format,
@@ -62,7 +64,8 @@ class ChartPolarAxis extends StatelessWidget {
   /// Length of the mark at each tick of the angle scale; zero draws none.
   final double tickLength;
 
-  /// Whether the labels and marks of the angle scale are inside the circle.
+  /// Whether the labels and marks of the angle scale are inside the ring
+  /// instead of outside the circle.
   final bool inside;
 
   /// Colour of the tick marks. Defaults to the axis colour of the chart
@@ -151,6 +154,8 @@ class _PolarAxisPainter extends ChartPainter {
 
     if (around) {
       final double side = inside ? -1 : 1;
+      // Outside the circle, or inside the ring of a chart that has a hole.
+      final double edge = inside && circle.innerRadius > 0 ? circle.innerRadius : circle.radius;
       final Paint mark = Paint()
         ..color = color
         ..strokeWidth = 1;
@@ -159,12 +164,12 @@ class _PolarAxisPainter extends ChartPainter {
         final Offset out = Offset(math.cos(a), math.sin(a));
         if (tickLength > 0) {
           context.canvas.drawLine(
-            circle.pointAt(a, circle.radius),
-            circle.pointAt(a, circle.radius + side * tickLength),
+            circle.pointAt(a, edge),
+            circle.pointAt(a, edge + side * tickLength),
             mark,
           );
         }
-        write(tick, circle.pointAt(a, circle.radius + side * (tickLength + padding)), out * side);
+        write(tick, circle.pointAt(a, edge + side * (tickLength + padding)), out * side);
       }
     } else {
       final double a = angle ?? polar.startAngle;
