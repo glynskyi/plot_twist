@@ -46,7 +46,23 @@ jobs:
         run: dart pub publish --dry-run
       - name: pub.dev score (fails on any lost point)
         # pana checks the pubspec screenshots with the WebP tools; without them it scores 0/10.
+        # The version is pinned so a new pana rule cannot fail an unrelated change.
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq webp
-          dart pub global activate pana
+          dart pub global activate pana 0.23.19
           dart pub global run pana --exit-code-threshold 0 .
+
+  web:
+    name: Gallery builds for the web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.50.0
+          channel: stable
+          cache: true
+      # The same build the Gallery workflow deploys after a merge.
+      - name: Build the gallery
+        working-directory: example
+        run: flutter build web --wasm --release --base-href /plot_twist/

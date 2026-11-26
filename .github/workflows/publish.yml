@@ -1,0 +1,31 @@
+name: Publish to pub.dev
+
+# Pushing a tag such as v0.1.1 publishes that version. pub.dev accepts the
+# upload only when automated publishing is turned on for this repository in
+# the package's admin page, with the tag pattern v{{version}}.
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # Required for authentication using OIDC
+    steps:
+      - uses: actions/checkout@v4
+      # Exchanges the GitHub OIDC token for a pub.dev token.
+      - uses: dart-lang/setup-dart@v1
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.50.0
+          channel: stable
+          cache: true
+      - name: The tag matches the version in pubspec.yaml
+        run: test "v$(grep '^version:' pubspec.yaml | cut -d' ' -f2)" = "$GITHUB_REF_NAME"
+      - run: flutter pub get
+      - run: flutter test
+      - name: Publish
+        run: dart pub publish --force
