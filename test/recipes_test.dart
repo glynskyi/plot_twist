@@ -283,4 +283,97 @@ void main() {
     expect(tester.getTopLeft(find.byKey(const Key('tl'))), const Offset(40, 0));
     expect(tester.getBottomRight(find.byKey(const Key('br'))), const Offset(400, 270));
   });
+
+  testWidgets('a stacked area chart whose tooltip shows the size of each layer', (
+    WidgetTester tester,
+  ) async {
+    final ChartController c = ChartController();
+    addTearDown(c.dispose);
+    // Three products over six months; the stack carries each layer's base.
+    final List<String> names = <String>['Basic', 'Plus', 'Pro'];
+    final List<ChartData> layers = ChartData.stacked(<ChartData>[
+      ChartData.fromValues(<double>[10, 12, 15, 14, 18, 20]),
+      ChartData.fromValues(<double>[5, 6, 6, 8, 9, 12]),
+      ChartData.fromValues(<double>[2, 2, 3, 5, 6, 9]),
+    ]);
+    await tester.pumpWidget(
+      _host(
+        Chart(
+          controller: c,
+          y: const LinearScale(range: FitDataRange(includeZero: true)),
+          top: const <Widget>[ChartLegend()],
+          children: <Widget>[
+            for (int i = 0; i < layers.length; i++)
+              LineSeries(data: layers[i], baseColumn: 1, label: names[i], curve: LineCurve.smooth),
+            const ChartCrosshair(),
+            ChartTooltip(
+              builder: (BuildContext context, List<ChartHit> hits) => Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  // A hit carries the top of its layer and the top of the one below.
+                  for (final ChartHit hit in hits)
+                    Text('${hit.series!.label}: ${(hit.value - hit.base!).round()}'),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    // The whole stack fits: the top layer ends at 20 + 12 + 9.
+    expect(c.y.range, const ChartRange(0, 41));
+    expect(find.text('Pro'), findsOneWidget);
+    // The layers take the first three colours of the palette.
+    expect(
+      c.series.map((ChartSeries s) => s.color!.toARGB32()),
+      ChartThemeData.defaultPalette.take(3).map((Color color) => color.toARGB32()),
+    );
+
+    final TestPointer mouse = TestPointer(1, PointerDeviceKind.mouse);
+    final ChartView view = c.view!;
+    await tester.sendEventToBinding(
+      mouse.hover(-view.chartRect.topLeft + Offset(view.x.toPixel(3) + 2, 60)),
+    );
+    await tester.pump();
+    expect(c.focus.value?.x, 3);
+    expect(find.text('Basic: 14'), findsOneWidget);
+    expect(find.text('Plus: 8'), findsOneWidget);
+    expect(find.text('Pro: 5'), findsOneWidget);
+  });
+
+  testWidgets('candles as OHLC bars above a dashed line at the last close', (
+    WidgetTester tester,
+  ) async {
+    final ChartController c = ChartController();
+    addTearDown(c.dispose);
+    final ChartData candles = ChartData(valueColumns: 4)
+      ..addRow(0, <double>[10, 14, 9, 13])
+      ..addRow(1, <double>[13, 15, 11, 12])
+      ..addRow(2, <double>[12, 18, 12, 17]);
+    final double last = candles.value(candles.length - 1, 3);
+    await tester.pumpWidget(
+      _host(
+        Chart(
+          controller: c,
+          children: <Widget>[
+            CandlestickSeries(data: candles, style: CandleStyle.ohlc, label: 'ACME'),
+            // Not a series: it is no legend entry and takes no palette colour.
+            ChartReferenceLine.y(
+              last,
+              dash: const <double>[4, 4],
+              label: Text('last ${last.toStringAsFixed(0)}'),
+            ),
+          ],
+        ),
+      ),
+    );
+    expect(c.series.single.label, 'ACME');
+    expect(find.text('last 17'), findsOneWidget);
+    // The label sits on the line, at the right end of the plot.
+    final Rect label = tester.getRect(find.text('last 17'));
+    expect(label.right, lessThanOrEqualTo(400));
+    expect(label.right, greaterThan(380));
+    expect((label.bottom - c.view!.y.toPixel(17)).abs(), lessThan(8));
+    expect(c.hitsAt(2).single.datum, const ChartCandle(open: 12, high: 18, low: 12, close: 17));
+  });
 }

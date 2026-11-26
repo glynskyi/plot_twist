@@ -45,6 +45,8 @@ The painters of the three series are renamed in the same way.
   for a `ChartPaint` with a painter of your own, where it used to be null.
 - `color` of `LineSeriesPainter`, `BarSeriesPainter` and `ScatterSeriesPainter`
   is optional and nullable. Null paints with `ChartPaintContext.seriesColor`.
+- `ChartSeries`, the view of a series that the controller hands out, has two
+  new members, `listed` and `visitMarks`.
 - `ChartHitMode` has a third value, `nearestY`. A `switch` over the modes in a
   series of your own needs a case for it; a series whose rows run along x
   adds no hit there.
