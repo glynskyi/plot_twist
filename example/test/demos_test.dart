@@ -9,6 +9,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:plot_twist/plot_twist.dart';
 import 'package:plot_twist_example/demos/a18_accessibility.dart';
 import 'package:plot_twist_example/demos/a19_transitions.dart';
+import 'package:plot_twist_example/demos/a21_polar.dart';
 import 'package:plot_twist_example/demos/a26_candlesticks.dart';
 import 'package:plot_twist_example/main.dart';
 import 'package:plot_twist_example/shared/fake.dart';
@@ -212,6 +213,88 @@ void main() {
       File('${screenshots.path}/a19_lying.png').writeAsBytesSync(png!.buffer.asUint8List());
       image.dispose();
     });
+  });
+
+  testWidgets('A21: the legend pulls a slice out, the slider moves the gauge, the radar is hit', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(2000, 1400);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(colorSchemeSeed: const Color(0xFF3F6FB5), fontFamily: 'Roboto'),
+        home: const Scaffold(
+          body: Padding(padding: EdgeInsets.all(16), child: PolarDemo()),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(seconds: 1));
+    ChartController chartOf(Type series) =>
+        ChartScope.of(tester.element(find.byType(series).first)).controller;
+    Offset plotOf(Type series) => tester.getTopLeft(
+      find.ancestor(of: find.byType(series).first, matching: find.byType(ChartStack)).first,
+    );
+
+    // The doughnut: five slices, each with a share and a legend item.
+    final ChartController pie = chartOf(PieSeries);
+    List<ChartHit> slices() {
+      final List<ChartHit> marks = <ChartHit>[];
+      pie.series.single.visitMarks(pie.view!, (ChartHit mark) {
+        marks.add(mark);
+        return true;
+      });
+      return marks;
+    }
+
+    expect(slices().map((ChartHit mark) => mark.label), <String>[
+      'Rent',
+      'Food',
+      'Travel',
+      'Savings',
+      'Fun',
+    ]);
+    final Offset before = slices()[1].sector!.center;
+    await tester.tap(find.text('Food'));
+    await tester.pump();
+    expect((slices()[1].sector!.center - before).distance, moreOrLessEquals(8, epsilon: 1e-6));
+    expect(slices()[0].sector!.center, before, reason: 'the others stay');
+
+    // Pointing at a slice names it.
+    final TestPointer mouse = TestPointer(1, PointerDeviceKind.mouse);
+    await tester.sendEventToBinding(mouse.hover(plotOf(PieSeries) + slices()[0].position));
+    await tester.pump();
+    expect(find.text('Rent: '), findsOneWidget);
+
+    // The gauge reads 72 and follows the slider.
+    final ChartController gauge = chartOf(RadialBarSeries);
+    double reading() => gauge.series.single.bounds()!.x!.max;
+    expect(find.text('72%'), findsOneWidget);
+    expect(reading(), 72);
+    final Rect slider = tester.getRect(find.byType(Slider));
+    await tester.tapAt(Offset(slider.left + slider.width * 0.25, slider.center.dy));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    final int value = int.parse(
+      tester.widget<Text>(find.textContaining('%').last).data!.replaceAll('%', ''),
+    );
+    expect(value, inInclusiveRange(20, 30));
+    expect(reading(), moreOrLessEquals(value.toDouble(), epsilon: 0.5));
+
+    // The radar: pointing between the centre and "Range" lists both models.
+    final ChartController radar = chartOf(RadarSeries);
+    final ChartView view = radar.view!;
+    final ChartPolarView circle = ChartPolarScope.of(tester.element(find.byType(RadarSeries).first))
+        .resolve(view);
+    await tester.sendEventToBinding(mouse.hover(plotOf(RadarSeries) + circle.toPixel(1, 3)));
+    await tester.pump();
+    expect(find.text('Model A: '), findsOneWidget);
+    expect(find.text('Model B: '), findsOneWidget);
+    expect(radar.hitsFor(radar.focus.value!).map((ChartHit hit) => hit.value).toSet(), <double>{
+      6,
+      9,
+    });
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('A26: the window follows the trading candle; zoomed out, a pixel column is one', (
