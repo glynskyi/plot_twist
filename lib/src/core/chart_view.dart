@@ -92,10 +92,17 @@ class ChartScaleView {
   /// Whether [value] is inside the visible window.
   bool contains(double value) => value >= min && value <= max;
 
+  /// What a tick provider needs to know about this window.
+  ChartTickContext get tickContext =>
+      ChartTickContext(min: min, max: max, extent: extent, direction: direction);
+
   /// The ticks for this window, computed once on demand.
-  late final List<ChartTick> ticks = scale.effectiveTicks.generate(
-    ChartTickContext(min: min, max: max, extent: extent, direction: direction),
-  );
+  late final List<ChartTick> ticks = scale.effectiveTicks.generate(tickContext);
+
+  /// The values of the minor ticks for this window, computed once on demand.
+  /// Empty unless the ticks of the scale have them, as `LinearTicks` does
+  /// with a `minorCount`.
+  late final List<double> minorTicks = scale.effectiveTicks.generateMinor(tickContext, ticks);
 
   @override
   bool operator ==(Object other) =>

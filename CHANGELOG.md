@@ -51,6 +51,11 @@ The painters of the three series are renamed in the same way.
 - `CandlestickSeries(style:)`: `CandleStyle.hollow` outlines the candles that
   close at or above their open, `CandleStyle.ohlc` draws OHLC bars. Both are
   still two draw calls per frame.
+- Minor ticks: `LinearTicks(minorCount:)`, `LogTicks(minor:)` and
+  `BandTicks(minor:)`. An axis draws a short mark at each
+  (`ChartAxis.minorTickLength`), and `ChartGrid(minor: true)` a fainter line.
+  They are in `ChartScaleView.minorTicks`; ticks of your own provide them by
+  overriding `ChartTicks.generateMinor`.
 - `dash` on `ChartGrid` and `ChartCrosshair`. For painters of your own,
   `ChartPainter.dashPath` cuts a path into dashes and
   `ChartPainter.drawDashedLine` draws a dashed straight line in one call.

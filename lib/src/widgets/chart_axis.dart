@@ -36,6 +36,7 @@ class ChartAxis extends StatelessWidget {
     this.prototype,
     this.markers = const <Widget>[],
     this.tickLength = 4,
+    this.minorTickLength = 2,
     this.labelGap = 4,
     this.labelSpacing = 6,
     this.showLine = true,
@@ -73,6 +74,11 @@ class ChartAxis extends StatelessWidget {
 
   /// Length of tick marks. `0` draws none.
   final double tickLength;
+
+  /// Length of the marks at minor ticks. `0` draws none. There are minor
+  /// ticks only when the ticks of the scale, or [ticks], have them: see
+  /// `LinearTicks.minorCount`.
+  final double minorTickLength;
 
   /// Gap between tick marks and labels.
   final double labelGap;
@@ -112,13 +118,7 @@ class ChartAxis extends StatelessWidget {
         final ChartScaleView s = view.scale(scaleId);
         if (override == null) return ChartTickSet(s.ticks);
         // The scale completes them: UTC, a logarithm base, band labels.
-        return ChartTickSet(
-          s.scale
-              .resolveTicks(override)
-              .generate(
-                ChartTickContext(min: s.min, max: s.max, extent: s.extent, direction: s.direction),
-              ),
-        );
+        return ChartTickSet(s.scale.resolveTicks(override).generate(s.tickContext));
       },
       builder: (BuildContext context, ChartTickSet tickSet) {
         final ChartScope scope = ChartScope.of(context);
@@ -130,6 +130,8 @@ class ChartAxis extends StatelessWidget {
           extent: extent,
           tickValues: <double>[for (final ChartTick t in tickSet.ticks) t.value],
           tickLength: tickLength,
+          minorTickLength: minorTickLength,
+          ticks: override,
           labelGap: labelGap,
           labelSpacing: labelSpacing,
           showLine: showLine,
@@ -245,6 +247,8 @@ class _ChartAxisBody extends MultiChildRenderObjectWidget {
     required this.extent,
     required this.tickValues,
     required this.tickLength,
+    required this.minorTickLength,
+    required this.ticks,
     required this.labelGap,
     required this.labelSpacing,
     required this.showLine,
@@ -258,6 +262,8 @@ class _ChartAxisBody extends MultiChildRenderObjectWidget {
   final ChartAxisExtent extent;
   final List<double> tickValues;
   final double tickLength;
+  final double minorTickLength;
+  final ChartTicks? ticks;
   final double labelGap;
   final double labelSpacing;
   final bool showLine;
@@ -273,6 +279,8 @@ class _ChartAxisBody extends MultiChildRenderObjectWidget {
     extent: extent,
     tickValues: tickValues,
     tickLength: tickLength,
+    minorTickLength: minorTickLength,
+    ticks: ticks,
     labelGap: labelGap,
     labelSpacing: labelSpacing,
     showLine: showLine,
@@ -290,6 +298,8 @@ class _ChartAxisBody extends MultiChildRenderObjectWidget {
       ..extent = extent
       ..tickValues = tickValues
       ..tickLength = tickLength
+      ..minorTickLength = minorTickLength
+      ..ticks = ticks
       ..labelGap = labelGap
       ..labelSpacing = labelSpacing
       ..showLine = showLine

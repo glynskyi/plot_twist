@@ -93,13 +93,25 @@ abstract class ChartTicks {
   const ChartTicks();
 
   /// "Nice" 1-2-5 ticks for a linear scale.
-  const factory ChartTicks.linear({double? spacing, ChartValueFormatter? format}) = LinearTicks;
+  const factory ChartTicks.linear({double? spacing, ChartValueFormatter? format, int minorCount}) =
+      LinearTicks;
 
   /// Ticks at exactly the given values.
   const factory ChartTicks.fixed(List<double> values, {ChartValueFormatter? format}) = FixedTicks;
 
   /// Returns the ticks to show for [context], in ascending order.
   List<ChartTick> generate(ChartTickContext context);
+
+  /// Returns the values of the minor ticks for [context], in ascending
+  /// order: marks without a label between the [major] ticks, which are what
+  /// [generate] returned for the same context. The default is none.
+  ///
+  /// An axis draws a short mark at each and a grid can draw a fainter line.
+  List<double> generateMinor(ChartTickContext context, List<ChartTick> major) => const <double>[];
+
+  // Minor ticks closer together than this many logical pixels are left out:
+  // they would run into one band.
+  static const double _minorSpacing = 3;
 
   /// Returns a "nice" step (1, 2, 2.5 or 5 times a power of ten) close to [raw].
   static double niceStep(double raw) {
@@ -153,13 +165,39 @@ String formatNumber(double value, {double? step}) => ChartTicks.formatNumber(val
 /// "Nice" ticks for a linear scale: multiples of 1, 2, 2.5 or 5 × 10ⁿ.
 class LinearTicks extends ChartTicks {
   /// Creates linear ticks roughly [spacing] logical pixels apart.
-  const LinearTicks({this.spacing, this.format});
+  const LinearTicks({this.spacing, this.format, this.minorCount = 0});
 
   /// Target distance between ticks, in logical pixels.
   final double? spacing;
 
   /// Custom label formatter.
   final ChartValueFormatter? format;
+
+  /// How many minor ticks divide the step between two ticks. `4` puts a
+  /// minor tick at every fifth of a step. They are left out while they would
+  /// be less than 3 logical pixels apart.
+  final int minorCount;
+
+  @override
+  List<double> generateMinor(ChartTickContext context, List<ChartTick> major) {
+    final double span = context.max - context.min;
+    if (minorCount <= 0 || !(span > 0) || !span.isFinite) return const <double>[];
+    final int parts = minorCount + 1;
+    final double step = ChartTicks.niceStep(span / context.targetCount(spacing));
+    final double minor = step / parts;
+    if (minor * context.extent / span < ChartTicks._minorSpacing) return const <double>[];
+    final List<double> values = <double>[];
+    // Counted from the tick at or below the window, to avoid accumulating
+    // floating point error.
+    final double base = (context.min / step).floorToDouble() * step;
+    for (int i = 1; i < 100000; i++) {
+      final double value = base + i * minor;
+      if (value > context.max + minor * 1e-9) break;
+      if (i % parts == 0 || value < context.min - minor * 1e-9) continue;
+      values.add((value / minor).roundToDouble() * minor);
+    }
+    return values;
+  }
 
   @override
   List<ChartTick> generate(ChartTickContext context) {
@@ -182,10 +220,13 @@ class LinearTicks extends ChartTicks {
 
   @override
   bool operator ==(Object other) =>
-      other is LinearTicks && other.spacing == spacing && other.format == format;
+      other is LinearTicks &&
+      other.spacing == spacing &&
+      other.format == format &&
+      other.minorCount == minorCount;
 
   @override
-  int get hashCode => Object.hash(spacing, format);
+  int get hashCode => Object.hash(spacing, format, minorCount);
 }
 
 /// Ticks at fixed values.
@@ -217,7 +258,7 @@ class FixedTicks extends ChartTicks {
 /// Ticks at powers of the base for a logarithmic scale.
 class LogTicks extends ChartTicks {
   /// Creates logarithmic ticks.
-  const LogTicks({this.base = 10, this.spacing, this.format});
+  const LogTicks({this.base = 10, this.spacing, this.format, this.minor = false});
 
   /// The logarithm base.
   final double base;
@@ -227,6 +268,38 @@ class LogTicks extends ChartTicks {
 
   /// Custom label formatter.
   final ChartValueFormatter? format;
+
+  /// Whether there are minor ticks at the multiples of every power that have
+  /// no label: 2, 3, 4 and so on up to 9 for base 10. Where the powers
+  /// themselves are too many to label, the ones without a label are the
+  /// minor ticks.
+  final bool minor;
+
+  @override
+  List<double> generateMinor(ChartTickContext context, List<ChartTick> major) {
+    if (!minor || !(context.min > 0) || !(context.max > context.min)) return const <double>[];
+    if (!(base > 0) || base == 1) return const <double>[];
+    final double logBase = math.log(base);
+    final int lo = (math.log(context.min) / logBase).floor();
+    final int hi = (math.log(context.max) / logBase).ceil();
+    // The space of one power. Its multiples crowd together towards the next
+    // power, where the last two are a ninth of that apart for base 10.
+    final double decade = context.extent * logBase / math.log(context.max / context.min);
+    final bool multiples =
+        base == base.roundToDouble() &&
+        base > 2 &&
+        decade * math.log(base / (base - 1)) / logBase >= ChartTicks._minorSpacing;
+    if (!multiples && decade < ChartTicks._minorSpacing) return const <double>[];
+    bool labelled(double v) => major.any((ChartTick t) => (t.value - v).abs() <= v * 1e-9);
+    final List<double> values = <double>[];
+    for (int e = lo; e <= hi; e++) {
+      for (double m = 1; m < (multiples ? base : 2); m++) {
+        final double v = _value(m, e);
+        if (_contains(context, v) && !labelled(v)) values.add(v);
+      }
+    }
+    return values;
+  }
 
   @override
   List<ChartTick> generate(ChartTickContext context) {
@@ -281,16 +354,20 @@ class LogTicks extends ChartTicks {
 
   @override
   bool operator ==(Object other) =>
-      other is LogTicks && other.base == base && other.spacing == spacing && other.format == format;
+      other is LogTicks &&
+      other.base == base &&
+      other.spacing == spacing &&
+      other.format == format &&
+      other.minor == minor;
 
   @override
-  int get hashCode => Object.hash(base, spacing, format);
+  int get hashCode => Object.hash(base, spacing, format, minor);
 }
 
 /// Ticks at whole numbers, for band (category) scales.
 class BandTicks extends ChartTicks {
   /// Creates band ticks. [labels] are looked up by index.
-  const BandTicks({this.labels, this.spacing, this.format});
+  const BandTicks({this.labels, this.spacing, this.format, this.minor = false});
 
   /// Category names, indexed by band value.
   final List<String>? labels;
@@ -300,6 +377,21 @@ class BandTicks extends ChartTicks {
 
   /// Custom label formatter, used when [labels] has no entry.
   final ChartValueFormatter? format;
+
+  /// Whether there are minor ticks at the borders between two bands, halfway
+  /// between their values. They are left out while they would be less than 3
+  /// logical pixels apart.
+  final bool minor;
+
+  @override
+  List<double> generateMinor(ChartTickContext context, List<ChartTick> major) {
+    final double span = context.max - context.min;
+    if (!minor || !(span > 0) || !span.isFinite) return const <double>[];
+    if (context.extent / span < ChartTicks._minorSpacing) return const <double>[];
+    return <double>[
+      for (double v = (context.min - 0.5).ceilToDouble() + 0.5; v <= context.max; v++) v,
+    ];
+  }
 
   @override
   List<ChartTick> generate(ChartTickContext context) {
@@ -326,10 +418,12 @@ class BandTicks extends ChartTicks {
       other is BandTicks &&
       listEquals(other.labels, labels) &&
       other.spacing == spacing &&
-      other.format == format;
+      other.format == format &&
+      other.minor == minor;
 
   @override
-  int get hashCode => Object.hash(labels == null ? null : Object.hashAll(labels!), spacing, format);
+  int get hashCode =>
+      Object.hash(labels == null ? null : Object.hashAll(labels!), spacing, format, minor);
 }
 
 /// The calendar unit a [TimeTicks] step is expressed in.

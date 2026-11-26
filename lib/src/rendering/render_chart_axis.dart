@@ -6,6 +6,7 @@ import 'package:flutter/scheduler.dart';
 
 import '../core/chart_controller.dart';
 import '../core/chart_view.dart';
+import '../core/ticks.dart';
 import '../interaction/pointer_hub.dart';
 import 'render_chart_layout.dart';
 import 'view_channel.dart';
@@ -151,6 +152,8 @@ class RenderChartAxis extends RenderBox
     ChartAxisExtent extent = const ChartAxisExtent.auto(),
     List<double> tickValues = const <double>[],
     double tickLength = 4,
+    double minorTickLength = 2,
+    ChartTicks? ticks,
     double labelGap = 4,
     double labelSpacing = 6,
     bool showLine = true,
@@ -162,6 +165,8 @@ class RenderChartAxis extends RenderBox
        _extent = extent,
        _tickValues = tickValues,
        _tickLength = tickLength,
+       _minorTickLength = minorTickLength,
+       _ticks = ticks,
        _labelGap = labelGap,
        _labelSpacing = labelSpacing,
        _showLine = showLine,
@@ -227,6 +232,34 @@ class RenderChartAxis extends RenderBox
   }
 
   /// Length of tick marks. `0` draws none.
+  /// Length of the marks at minor ticks.
+  double get minorTickLength => _minorTickLength;
+  double _minorTickLength;
+  set minorTickLength(double value) {
+    if (value == _minorTickLength) return;
+    _minorTickLength = value;
+    markNeedsPaint();
+  }
+
+  /// The ticks of this axis, when they are not the ones of its scale.
+  ChartTicks? get ticks => _ticks;
+  ChartTicks? _ticks;
+  set ticks(ChartTicks? value) {
+    if (value == _ticks) return;
+    _ticks = value;
+    markNeedsPaint();
+  }
+
+  // The minor ticks of [scale], or of the ticks given to this axis. They are
+  // read while painting, so they follow the window without a rebuild.
+  List<double> _minorTicks(ChartScaleView scale) {
+    final ChartTicks? own = _ticks;
+    if (own == null) return scale.minorTicks;
+    final ChartTicks resolved = scale.scale.resolveTicks(own);
+    final ChartTickContext context = scale.tickContext;
+    return resolved.generateMinor(context, resolved.generate(context));
+  }
+
   double get tickLength => _tickLength;
   double _tickLength;
   set tickLength(double value) {
@@ -447,6 +480,23 @@ class RenderChartAxis extends RenderBox
           if (!pixel.isFinite || pixel < -0.5 || pixel > main + 0.5) continue;
           final Offset p = a + (_horizontal ? Offset(pixel, 0) : Offset(0, pixel));
           canvas.drawLine(p, p + tick, paint);
+        }
+      }
+      if (_minorTickLength > 0) {
+        final double main = _horizontal ? size.width : size.height;
+        final Offset mark = tick == Offset.zero
+            ? switch (_side) {
+                ChartSide.bottom => Offset(0, _minorTickLength),
+                ChartSide.top => Offset(0, -_minorTickLength),
+                ChartSide.left => Offset(-_minorTickLength, 0),
+                ChartSide.right => Offset(_minorTickLength, 0),
+              }
+            : tick * (_minorTickLength / _tickLength);
+        for (final double value in _minorTicks(scale)) {
+          final double pixel = scale.toPixel(value);
+          if (!pixel.isFinite || pixel < -0.5 || pixel > main + 0.5) continue;
+          final Offset p = a + (_horizontal ? Offset(pixel, 0) : Offset(0, pixel));
+          canvas.drawLine(p, p + mark, paint);
         }
       }
     }

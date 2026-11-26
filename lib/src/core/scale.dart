@@ -479,7 +479,7 @@ class LogScale extends ChartScale {
   // Ticks written without a base (it defaults to 10) get this scale's.
   @override
   ChartTicks resolveTicks(ChartTicks ticks) => ticks is LogTicks && ticks.base == 10 && base != 10
-      ? LogTicks(base: base, spacing: ticks.spacing, format: ticks.format)
+      ? LogTicks(base: base, spacing: ticks.spacing, format: ticks.format, minor: ticks.minor)
       : ticks;
 
   @override
@@ -554,7 +554,7 @@ class BandScale extends ChartScale {
   @override
   ChartTicks resolveTicks(ChartTicks ticks) =>
       ticks is BandTicks && ticks.labels == null && labels != null
-      ? BandTicks(labels: labels, spacing: ticks.spacing, format: ticks.format)
+      ? BandTicks(labels: labels, spacing: ticks.spacing, format: ticks.format, minor: ticks.minor)
       : ticks;
 
   @override
