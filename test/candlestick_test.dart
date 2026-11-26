@@ -277,6 +277,134 @@ void main() {
     expect(pixel(310, 153), _white);
   });
 
+  group('styles', () {
+    // The candles of the test above: 40 px per x unit, 3 px per y unit, a
+    // body 28 px wide and lines 2 px thick.
+    ChartData threeCandles() => _candles(
+      <double>[2, 5, 8],
+      <(double, double, double, double)>[
+        (20, 60, 10, 40), // rising
+        (70, 80, 30, 50), // falling
+        (50, 55, 45, 50), // open == close
+      ],
+    );
+    Widget chart(CandleStyle style, {double wickWidth = 2, double widthFactor = 0.7}) => Chart(
+      x: const LinearScale(range: FixedRange(0, 10)),
+      y: const LinearScale(range: FixedRange(0, 100)),
+      children: <Widget>[
+        CandlestickSeries(
+          data: threeCandles(),
+          style: style,
+          step: 1,
+          widthFactor: widthFactor,
+          wickWidth: wickWidth,
+          upColor: _up,
+          downColor: _down,
+          isolate: false,
+        ),
+      ],
+    );
+
+    testWidgets('hollow: a rising candle is an outline, a falling one is filled', (
+      WidgetTester tester,
+    ) async {
+      final int Function(int x, int y) pixel = await _render(tester, chart(CandleStyle.hollow));
+      // Rising, centred on x = 80: the body spans x 66 to 94 and y 180 to 240.
+      expect(pixel(80, 210), _white, reason: 'inside the body');
+      expect(pixel(72, 190), _white, reason: 'inside the body');
+      expect(pixel(67, 210), _up.toARGB32(), reason: 'left edge');
+      expect(pixel(93, 210), _up.toARGB32(), reason: 'right edge');
+      expect(pixel(80, 181), _up.toARGB32(), reason: 'top edge');
+      expect(pixel(80, 239), _up.toARGB32(), reason: 'bottom edge');
+      expect(pixel(80, 150), _up.toARGB32(), reason: 'upper wick');
+      expect(pixel(80, 255), _up.toARGB32(), reason: 'lower wick');
+      expect(pixel(70, 150), _white, reason: 'beside the upper wick');
+      expect(pixel(64, 210), _white, reason: 'left of the body');
+
+      // Falling, centred on x = 200: filled from y = 90 to y = 150.
+      expect(pixel(200, 120), _down.toARGB32());
+      expect(pixel(190, 91), _down.toARGB32());
+      expect(pixel(200, 61), _down.toARGB32());
+      expect(pixel(200, 209), _down.toARGB32());
+
+      // Open equals close: still a hairline.
+      expect(pixel(310, 150), isNot(_white));
+      expect(pixel(310, 147), _white);
+    });
+
+    testWidgets('hollow: a body too small for an outline is filled', (WidgetTester tester) async {
+      // A body 4 px wide has no room between two 2 px edges.
+      final int Function(int x, int y) pixel = await _render(
+        tester,
+        chart(CandleStyle.hollow, widthFactor: 0.1),
+      );
+      expect(pixel(80, 210), _up.toARGB32());
+      expect(pixel(79, 200), _up.toARGB32());
+    });
+
+    testWidgets('ohlc: a stem from low to high, the open to its left, the close to its right', (
+      WidgetTester tester,
+    ) async {
+      final int Function(int x, int y) pixel = await _render(tester, chart(CandleStyle.ohlc));
+      // Rising, centred on x = 80: low 270, open 240, close 180, high 120.
+      expect(pixel(80, 125), _up.toARGB32(), reason: 'stem near the high');
+      expect(pixel(80, 210), _up.toARGB32(), reason: 'stem');
+      expect(pixel(80, 265), _up.toARGB32(), reason: 'stem near the low');
+      expect(pixel(72, 240), _up.toARGB32(), reason: 'open tick');
+      expect(pixel(88, 240), _white, reason: 'no tick right of the stem at the open');
+      expect(pixel(88, 180), _up.toARGB32(), reason: 'close tick');
+      expect(pixel(72, 180), _white, reason: 'no tick left of the stem at the close');
+      expect(pixel(72, 210), _white, reason: 'no body');
+      expect(pixel(88, 210), _white, reason: 'no body');
+      expect(pixel(96, 180), _white, reason: 'the tick is as long as half a body');
+
+      // Falling, centred on x = 200: open 90, close 150.
+      expect(pixel(192, 90), _down.toARGB32());
+      expect(pixel(208, 150), _down.toARGB32());
+      expect(pixel(208, 90), _white);
+      expect(pixel(200, 120), _down.toARGB32());
+
+      // Open equals close, centred on x = 320: both ticks at y = 150.
+      expect(pixel(312, 150), _up.toARGB32());
+      expect(pixel(328, 150), _up.toARGB32());
+    });
+
+    testWidgets('every style is drawn with two calls', (WidgetTester tester) async {
+      final ChartController c = ChartController();
+      addTearDown(c.dispose);
+      for (final CandleStyle style in CandleStyle.values) {
+        await tester.pumpWidget(
+          host(
+            Chart(
+              controller: c,
+              children: <Widget>[CandlestickSeries(data: _walk(60), style: style)],
+            ),
+          ),
+        );
+        final TestRecordingCanvas canvas = TestRecordingCanvas();
+        tester
+            .widget<ChartPaint>(find.byType(ChartPaint))
+            .painter
+            .paint(ChartPaintContext(canvas: canvas, view: c.view!));
+        expect(canvas.invocations.map((RecordedInvocation i) => i.invocation.memberName), <Symbol>[
+          #drawPath,
+          #drawPath,
+        ], reason: style.name);
+      }
+    });
+
+    test('a change of style repaints, and does not change the ranges', () {
+      final ChartData data = _fourDays();
+      CandlestickSeriesPainter painter(CandleStyle style) =>
+          CandlestickSeriesPainter(data: data, upColor: _up, downColor: _down, style: style);
+      expect(painter(CandleStyle.filled).style, CandleStyle.filled);
+      expect(painter(CandleStyle.hollow).shouldRepaint(painter(CandleStyle.filled)), isTrue);
+      expect(painter(CandleStyle.hollow).shouldRescale(painter(CandleStyle.filled)), isFalse);
+      expect(painter(CandleStyle.ohlc).shouldRepaint(painter(CandleStyle.ohlc)), isFalse);
+      expect(CandlestickSeries(data: data).style, CandleStyle.filled);
+    });
+  });
+
   testWidgets('the step is the smallest gap, so a weekend does not widen the candles', (
     WidgetTester tester,
   ) async {

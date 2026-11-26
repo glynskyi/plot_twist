@@ -48,6 +48,9 @@ The painters of the three series are renamed in the same way.
   mode is stored in `ChartFocus.mode`, and `ChartController.hitsFor(focus)`
   returns the data points a focus stands for. `snapDistance` limits how far
   the focus snaps.
+- `CandlestickSeries(style:)`: `CandleStyle.hollow` outlines the candles that
+  close at or above their open, `CandleStyle.ohlc` draws OHLC bars. Both are
+  still two draw calls per frame.
 - `dash` on `ChartGrid` and `ChartCrosshair`. For painters of your own,
   `ChartPainter.dashPath` cuts a path into dashes and
   `ChartPainter.drawDashedLine` draws a dashed straight line in one call.

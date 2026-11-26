@@ -49,13 +49,29 @@ class ChartCandle {
   String toString() => 'ChartCandle(open: $open, high: $high, low: $low, close: $close)';
 }
 
+/// How a [CandlestickSeries] draws a candle.
+enum CandleStyle {
+  /// A filled body between the open and the close, and a wick from the low
+  /// to the high.
+  filled,
+
+  /// As [filled], except that a candle that closes at or above its open has
+  /// an outlined body.
+  hollow,
+
+  /// A bar from the low to the high, with a tick to the left at the open and
+  /// one to the right at the close.
+  ohlc,
+}
+
 /// Candlesticks, one per row of a [ChartData] that has a value column each for
 /// the open, high, low and close.
 ///
 /// Each candle is centred on its x value. Its body is [widthFactor] × [step]
 /// data units wide and spans from the open to the close; its wick spans from the
 /// low to the high. A candle that closes at or above its open is drawn in
-/// [upColor], any other in [downColor].
+/// [upColor], any other in [downColor]. [style] draws hollow candles or OHLC
+/// bars instead.
 ///
 /// When there are more candles than pixels, each pixel column is drawn as one
 /// candle made of the rows in it: from their lowest low to their highest high,
@@ -77,6 +93,7 @@ class CandlestickSeries extends StatelessWidget {
     this.label,
     this.upColor = const Color(0xFF59A14F),
     this.downColor = const Color(0xFFE15759),
+    this.style = CandleStyle.filled,
     double? widthFactor,
     this.step,
     this.wickWidth = 1,
@@ -116,6 +133,9 @@ class CandlestickSeries extends StatelessWidget {
   /// Colour of a candle that closes below its open.
   final Color downColor;
 
+  /// How a candle is drawn: filled, hollow or as an OHLC bar.
+  final CandleStyle style;
+
   /// Body width as a fraction of [step]. Defaults to `0.7`.
   final double widthFactor;
 
@@ -128,7 +148,9 @@ class CandlestickSeries extends StatelessWidget {
   /// does not widen the candles.
   final double? step;
 
-  /// Wick width in logical pixels. `0` draws no wicks.
+  /// Wick width in logical pixels. `0` draws no wicks. It is also the
+  /// thickness of the outline of a hollow candle and of the lines of an OHLC
+  /// bar, which are at least one pixel thick.
   final double wickWidth;
 
   /// Whether the series is shown; a hidden series stays listed for legends.
@@ -163,6 +185,7 @@ class CandlestickSeries extends StatelessWidget {
         closeColumn: closeColumn,
         upColor: upColor,
         downColor: downColor,
+        style: style,
         widthFactor: widthFactor,
         step: step,
         wickWidth: wickWidth,
@@ -189,6 +212,7 @@ class CandlestickSeriesPainter extends ChartSeriesPainter {
     this.closeColumn = 3,
     required this.upColor,
     required this.downColor,
+    this.style = CandleStyle.filled,
     double? widthFactor,
     this.step,
     this.wickWidth = 1,
@@ -224,6 +248,9 @@ class CandlestickSeriesPainter extends ChartSeriesPainter {
 
   /// Colour of a candle that closes below its open.
   final Color downColor;
+
+  /// How a candle is drawn.
+  final CandleStyle style;
 
   /// Body width as a fraction of the step.
   final double widthFactor;
@@ -281,6 +308,7 @@ class CandlestickSeriesPainter extends ChartSeriesPainter {
       shouldRescale(oldDelegate) ||
       oldDelegate.upColor != upColor ||
       oldDelegate.downColor != downColor ||
+      oldDelegate.style != style ||
       oldDelegate.wickWidth != wickWidth;
 
   @override
@@ -399,6 +427,8 @@ class CandlestickSeriesPainter extends ChartSeriesPainter {
       path.addRect(Rect.fromLTRB(math.min(x1, x2), top, math.max(x1, x2), bottom));
     }
 
+    // Thickness of the outline of a hollow candle and of an OHLC bar.
+    final double line = math.max(1, wickWidth);
     final double first = data.x(start);
     if (data.isSorted && _stepPixels(xs, first, xs.toPixel(first), step) < 1) {
       // More candles than pixels: one candle per pixel column.
@@ -434,19 +464,46 @@ class CandlestickSeriesPainter extends ChartSeriesPainter {
         final ui.Path path = close < open ? down : up;
         final double x = data.x(i);
         final double centre = xs.toPixel(x);
-        if (wickWidth > 0) {
-          box(
-            path,
-            centre - wickWidth / 2,
-            centre + wickWidth / 2,
-            ys.toPixel(low),
-            ys.toPixel(high),
-          );
-        }
         final double body = _stepPixels(xs, x, centre, step) * widthFactor;
-        // A body no wider than its wick adds nothing to it.
-        if (body > wickWidth) {
-          box(path, centre - body / 2, centre + body / 2, ys.toPixel(open), ys.toPixel(close));
+        final double left = centre - body / 2;
+        final double right = centre + body / 2;
+        final double yOpen = ys.toPixel(open);
+        final double yClose = ys.toPixel(close);
+        final double yLow = ys.toPixel(low);
+        final double yHigh = ys.toPixel(high);
+        void wick(double from, double to) {
+          if (wickWidth > 0) box(path, centre - wickWidth / 2, centre + wickWidth / 2, from, to);
+        }
+
+        switch (style) {
+          case CandleStyle.filled:
+            wick(yLow, yHigh);
+            // A body no wider than its wick adds nothing to it.
+            if (body > wickWidth) box(path, left, right, yOpen, yClose);
+          case CandleStyle.hollow:
+            final double top = math.min(yOpen, yClose);
+            final double bottom = math.max(yOpen, yClose);
+            // An outline needs room between its edges.
+            final bool outlined =
+                close >= open && body > line * 2 + 1 && bottom - top > line * 2 + 1;
+            if (!outlined) {
+              wick(yLow, yHigh);
+              if (body > wickWidth) box(path, left, right, yOpen, yClose);
+            } else {
+              // The wick stops at the body, so the body stays empty.
+              if (top - yHigh >= 0.5) wick(yHigh, top);
+              if (yLow - bottom >= 0.5) wick(bottom, yLow);
+              box(path, left, right, top, top + line);
+              box(path, left, right, bottom - line, bottom);
+              box(path, left, left + line, top, bottom);
+              box(path, right - line, right, top, bottom);
+            }
+          case CandleStyle.ohlc:
+            box(path, centre - line / 2, centre + line / 2, yLow, yHigh);
+            if (body > line) {
+              box(path, left, centre, yOpen - line / 2, yOpen + line / 2);
+              box(path, centre, right, yClose - line / 2, yClose + line / 2);
+            }
         }
       }
     }
