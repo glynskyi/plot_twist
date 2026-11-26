@@ -21,7 +21,7 @@ import 'demos/a17_annotations.dart';
 import 'demos/a18_accessibility.dart';
 import 'demos/a19_transitions.dart';
 import 'demos/a20_legend.dart';
-import 'demos/a21_donut.dart';
+import 'demos/a21_polar.dart';
 import 'demos/a22_styling.dart';
 import 'demos/a23_navigator.dart';
 import 'demos/a24_sparklines.dart';
@@ -173,10 +173,10 @@ final List<Demo> demos = <Demo>[
   ),
   Demo(
     'A21',
-    'Non-Cartesian content',
-    'A donut with a widget centre, widget callouts and a hover tooltip.',
-    'a21_donut.dart',
-    (_) => const DonutDemo(),
+    'Pie, gauge and radar',
+    'A doughnut, a gauge and a radar chart with the legend, tooltip and labels of the others.',
+    'a21_polar.dart',
+    (_) => const PolarDemo(),
   ),
   Demo(
     'A22',
