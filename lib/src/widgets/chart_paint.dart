@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
@@ -57,6 +60,83 @@ abstract class ChartPainter extends Listenable {
   /// Whether a pointer at the plot-local [position] hits something this
   /// painter drew. Returning true stops layers underneath from being hit.
   bool hitTest(Offset position, ChartView view) => false;
+
+  /// Cuts [source] into dashes.
+  ///
+  /// [pattern] lists the lengths of alternating dashes and gaps in logical
+  /// pixels; an empty one returns the path as it is. Every contour of the
+  /// path starts [phase] logical pixels into the pattern. A phase that grows
+  /// by the length a path loses at its start keeps the dashes where they
+  /// are, which is how a dashed line stays still while it is panned.
+  static ui.Path dashPath(ui.Path source, List<double> pattern, {double phase = 0}) {
+    if (pattern.isEmpty) return source;
+    final ui.Path result = ui.Path();
+    for (final ui.PathMetric metric in source.computeMetrics()) {
+      _forEachDash(pattern, phase, metric.length, (double from, double to) {
+        result.addPath(metric.extractPath(from, to), Offset.zero);
+      });
+    }
+    return result;
+  }
+
+  /// Draws the straight line between [from] and [to] with [paint], dashed by
+  /// [pattern] as in [dashPath]. All dashes are drawn in one call, so this is
+  /// the cheap way to dash a rule or a grid line.
+  static void drawDashedLine(
+    Canvas canvas,
+    Offset from,
+    Offset to,
+    Paint paint,
+    List<double> pattern, {
+    double phase = 0,
+  }) {
+    final Offset delta = to - from;
+    final double length = delta.distance;
+    if (pattern.isEmpty || !(length > 0) || !length.isFinite) {
+      canvas.drawLine(from, to, paint);
+      return;
+    }
+    final Offset unit = delta / length;
+    final List<double> points = <double>[];
+    _forEachDash(pattern, phase, length, (double start, double end) {
+      points
+        ..add(from.dx + unit.dx * start)
+        ..add(from.dy + unit.dy * start)
+        ..add(from.dx + unit.dx * end)
+        ..add(from.dy + unit.dy * end);
+    });
+    if (points.isEmpty) return;
+    canvas.drawRawPoints(ui.PointMode.lines, Float32List.fromList(points), paint);
+  }
+
+  // Calls [visit] with the start and end of every dash on a line of [length]
+  // that starts [phase] into [pattern].
+  static void _forEachDash(
+    List<double> pattern,
+    double phase,
+    double length,
+    void Function(double from, double to) visit,
+  ) {
+    // A dash or gap of no length would never end the walk along the line.
+    double lengthAt(int index) => math.max(0.5, pattern[index % pattern.length]);
+    double total = 0;
+    for (int i = 0; i < pattern.length; i++) {
+      total += lengthAt(i);
+    }
+    // A pattern of odd length swaps dashes and gaps every time it repeats.
+    if (pattern.length.isOdd) total *= 2;
+    final double offset = phase % total;
+    double distance = offset.isFinite ? -offset : 0;
+    for (int index = 0; distance < length; index++) {
+      final double end = distance + lengthAt(index);
+      if (index.isEven) {
+        final double from = math.max(0, distance);
+        final double to = math.min(length, end);
+        if (to > from) visit(from, to);
+      }
+      distance = end;
+    }
+  }
 }
 
 /// A [ChartPainter] that draws data.

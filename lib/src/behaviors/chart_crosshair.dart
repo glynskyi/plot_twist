@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 
@@ -37,6 +38,7 @@ class ChartCrosshair extends StatefulWidget {
     this.tap = false,
     this.color,
     this.width = 1,
+    this.dash,
     this.pointRadius = 4,
   }) : vertical = vertical ?? mode != ChartHitMode.nearestY,
        horizontal = horizontal ?? mode == ChartHitMode.nearestY;
@@ -92,6 +94,10 @@ class ChartCrosshair extends StatefulWidget {
 
   /// Line width.
   final double width;
+
+  /// Dash pattern of the lines: lengths of alternating dashes and gaps. Null
+  /// draws solid lines.
+  final List<double>? dash;
 
   /// Radius of the dots drawn on series.
   final double pointRadius;
@@ -215,6 +221,7 @@ class _ChartCrosshairState extends State<ChartCrosshair> {
           color: widget.color ?? theme.crosshairColor,
           ring: theme.tooltipTextStyle.color ?? const Color(0xFFFFFFFF),
           width: widget.width,
+          dash: widget.dash,
           pointRadius: widget.pointRadius,
         ),
       ),
@@ -233,6 +240,7 @@ class _CrosshairPainter extends ChartPainter {
     required this.color,
     required this.ring,
     required this.width,
+    required this.dash,
     required this.pointRadius,
   }) : super(repaint: controller.focus);
 
@@ -245,6 +253,7 @@ class _CrosshairPainter extends ChartPainter {
   final Color color;
   final Color ring;
   final double width;
+  final List<double>? dash;
   final double pointRadius;
 
   @override
@@ -256,19 +265,26 @@ class _CrosshairPainter extends ChartPainter {
     final Paint line = Paint()
       ..color = color
       ..strokeWidth = width;
+    final List<double> pattern = dash ?? const <double>[];
     // A linked chart shares the dimension the focus runs along. The other
     // coordinate is the pointer's, which only means something in its chart.
     final bool own = identical(focus.source, controller);
     final bool alongY = focus.mode == ChartHitMode.nearestY;
     final double x = view.scale(xScale).toPixel(focus.x);
     if (vertical && (own || !alongY) && x >= 0 && x <= view.size.width) {
-      canvas.drawLine(Offset(x, 0), Offset(x, view.size.height), line);
+      ChartPainter.drawDashedLine(canvas, Offset(x, 0), Offset(x, view.size.height), line, pattern);
     }
     final double? focusY = focus.y;
     if (horizontal && focusY != null && (own || alongY) && view.scales.containsKey(yScale)) {
       final double y = view.scale(yScale).toPixel(focusY);
       if (y >= 0 && y <= view.size.height) {
-        canvas.drawLine(Offset(0, y), Offset(view.size.width, y), line);
+        ChartPainter.drawDashedLine(
+          canvas,
+          Offset(0, y),
+          Offset(view.size.width, y),
+          line,
+          pattern,
+        );
       }
     }
     if (!showPoints) return;
@@ -295,6 +311,7 @@ class _CrosshairPainter extends ChartPainter {
       oldDelegate.color != color ||
       oldDelegate.ring != ring ||
       oldDelegate.width != width ||
+      !listEquals(oldDelegate.dash, dash) ||
       oldDelegate.pointRadius != pointRadius;
 }
 

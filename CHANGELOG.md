@@ -35,6 +35,11 @@ The painters of the three series are renamed in the same way.
 - The default tooltip shows `ChartHit.value`, which is `y` for everything
   except horizontal bars.
 
+### Fixed
+
+- A dashed `LineSeries` keeps its dashes in place while it is panned. They
+  used to jump along the line whenever a row left the window.
+
 ### New
 
 - `ChartCrosshair(mode:)`: `ChartHitMode.nearest` snaps to the closest point
@@ -43,6 +48,9 @@ The painters of the three series are renamed in the same way.
   mode is stored in `ChartFocus.mode`, and `ChartController.hitsFor(focus)`
   returns the data points a focus stands for. `snapDistance` limits how far
   the focus snaps.
+- `dash` on `ChartGrid` and `ChartCrosshair`. For painters of your own,
+  `ChartPainter.dashPath` cuts a path into dashes and
+  `ChartPainter.drawDashedLine` draws a dashed straight line in one call.
 - `ChartTooltip(yScale:)`, for a focus measured on another vertical scale.
 - `ChartHit.base`, `ChartHit.valueAxis`, `ChartHit.value` and
   `ChartHit.argument`. A bar's hit carries the value it starts from, so a

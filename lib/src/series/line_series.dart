@@ -462,18 +462,31 @@ class LineSeriesPainter extends ChartSeriesPainter {
     }
 
     if (width > 0) {
+      final List<double>? pattern = dash;
+      final bool dashed = pattern != null && pattern.isNotEmpty;
       ui.Path path = ui.Path();
+      // The piece of a dashed line that the window cuts off at its start is
+      // dashed on its own, from where the pattern has got to by then.
+      final ui.Path head = ui.Path();
+      double headPhase = 0;
       line.forEachSegment((int from, int to) {
         if (to - from == 1) {
           // A lone point between gaps: draw it as a dot-sized segment.
           path.moveTo(line.x(from), line.y(from));
           path.lineTo(line.x(from) + 0.01, line.y(from));
+        } else if (dashed && from == 0 && !dense) {
+          final (double, double)? ends = addCurve(head, from, to);
+          if (ends != null) {
+            headPhase = _dashPhase(xs, ys, start, smooth ? ends.$1 : line.x(0), line.y(0));
+          }
         } else {
           addCurve(path, from, to);
         }
       });
-      final List<double>? pattern = dash;
-      if (pattern != null && pattern.isNotEmpty) path = _dashed(path, pattern);
+      if (dashed) {
+        path = ChartPainter.dashPath(path, pattern)
+          ..addPath(ChartPainter.dashPath(head, pattern, phase: headPhase), Offset.zero);
+      }
       final Paint paint = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = width
@@ -506,6 +519,82 @@ class LineSeriesPainter extends ChartSeriesPainter {
             ..strokeWidth = pointRadius * 2,
         );
       }
+    }
+  }
+
+  // Rows a dash pattern is measured back over, at most.
+  static const int _dashBlock = 4096;
+
+  // How far into its dash pattern the line is at ([firstX], [firstY]), where
+  // its path starts.
+  //
+  // The path starts at the first row near the window, and further in when
+  // that row is far away. Dashes counted from there would jump along the line
+  // whenever a row leaves the window. So the length of the line is measured
+  // back to where it really starts: after a gap, or else at the start of the
+  // block of [_dashBlock] rows that [start] is in.
+  double _dashPhase(ChartScaleView xs, ChartScaleView ys, int start, double firstX, double firstY) {
+    if (!data.isSorted) return 0;
+    final Offset? origin = _pixelOf(start, xs, ys);
+    if (origin == null) return 0;
+    // The rows before [start], nearest first.
+    final List<Offset> back = <Offset>[];
+    final int floor = start - start % _dashBlock;
+    int anchor = start;
+    for (; anchor > floor; anchor--) {
+      final Offset? pixel = _pixelOf(anchor - 1, xs, ys);
+      if (pixel == null) break;
+      back.add(pixel);
+    }
+    double length = 0;
+    switch (curve) {
+      case LineCurve.linear:
+        Offset to = origin;
+        for (final Offset from in back) {
+          length += (to - from).distance;
+          to = from;
+        }
+        return length + (Offset(firstX, firstY) - origin).distance;
+      case LineCurve.step:
+        Offset to = origin;
+        for (final Offset from in back) {
+          length += (to.dx - from.dx).abs() + (to.dy - from.dy).abs();
+          to = from;
+        }
+        // A step is level until the next row.
+        return length + (firstX - origin.dx).abs();
+      case LineCurve.smooth:
+        // Measured around the first row, so the result is the same wherever
+        // the line has been panned to.
+        final _Polyline lead = _Polyline();
+        for (final Offset pixel in back.reversed) {
+          lead.add(pixel.dx - origin.dx, pixel.dy - origin.dy);
+        }
+        lead.add(0, 0);
+        Offset? relative(int row) {
+          final Offset? pixel = row >= 0 && row < data.length ? _pixelOf(row, xs, ys) : null;
+          return pixel == null ? null : pixel - origin;
+        }
+        final Offset? next = relative(start + 1);
+        if (next != null) lead.add(next.dx, next.dy);
+        final bool ascending = xs.toPixel(xs.max) >= xs.toPixel(xs.min);
+        final double cutAt = firstX - origin.dx;
+        final ui.Path path = ui.Path();
+        _addSmooth(
+          path,
+          lead,
+          0,
+          lead.length,
+          before: anchor > floor || anchor == 0 ? null : relative(anchor - 1),
+          after: next == null ? null : relative(start + 2),
+          min: ascending ? double.negativeInfinity : cutAt,
+          max: ascending ? cutAt : double.infinity,
+          cut: true,
+        );
+        for (final ui.PathMetric metric in path.computeMetrics()) {
+          length += metric.length;
+        }
+        return length;
     }
   }
 
@@ -716,26 +805,6 @@ class LineSeriesPainter extends ChartSeriesPainter {
   }
 
   static double _nonZero(double v) => v == 0 ? 1e-9 : v;
-
-  static ui.Path _dashed(ui.Path source, List<double> pattern) {
-    final ui.Path result = ui.Path();
-    for (final ui.PathMetric metric in source.computeMetrics()) {
-      double distance = 0;
-      int index = 0;
-      while (distance < metric.length) {
-        final double length = math.max(0.5, pattern[index % pattern.length]);
-        if (index.isEven) {
-          result.addPath(
-            metric.extractPath(distance, math.min(metric.length, distance + length)),
-            Offset.zero,
-          );
-        }
-        distance += length;
-        index++;
-      }
-    }
-    return result;
-  }
 }
 
 // A growable list of pixel points split into segments (at data gaps).

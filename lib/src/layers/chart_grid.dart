@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../plot_twist.dart';
@@ -16,6 +17,7 @@ class ChartGrid extends StatelessWidget {
     this.vertical = true,
     this.color,
     this.width = 1,
+    this.dash,
   });
 
   /// The scale whose ticks produce vertical lines.
@@ -36,6 +38,10 @@ class ChartGrid extends StatelessWidget {
   /// Line width.
   final double width;
 
+  /// Dash pattern: lengths of alternating dashes and gaps. Null draws solid
+  /// lines. The dashes move with the data when the chart is panned.
+  final List<double>? dash;
+
   @override
   Widget build(BuildContext context) => ChartPaint(
     painter: _GridPainter(
@@ -45,6 +51,7 @@ class ChartGrid extends StatelessWidget {
       vertical: vertical,
       color: color ?? ChartTheme.of(context).gridColor,
       width: width,
+      dash: dash,
     ),
   );
 }
@@ -57,6 +64,7 @@ class _GridPainter extends ChartPainter {
     required this.vertical,
     required this.color,
     required this.width,
+    required this.dash,
   });
 
   final Object xScale;
@@ -65,6 +73,7 @@ class _GridPainter extends ChartPainter {
   final bool vertical;
   final Color color;
   final double width;
+  final List<double>? dash;
 
   @override
   void paint(ChartPaintContext context) {
@@ -72,18 +81,37 @@ class _GridPainter extends ChartPainter {
     final Paint paint = Paint()
       ..color = color
       ..strokeWidth = width;
-    if (vertical && view.scales.containsKey(xScale)) {
-      final ChartScaleView xs = view.scale(xScale);
+    final ChartScaleView? xs = view.scales[xScale];
+    final ChartScaleView? ys = view.scales[yScale];
+    final List<double> pattern = dash ?? const <double>[];
+    // Dashes are anchored to the scale they run along, so the whole grid
+    // moves as one when the chart is panned.
+    if (vertical && xs != null) {
+      final double phase = pattern.isEmpty || ys == null ? 0 : -ys.scaledToPixel(0);
       for (final ChartTick tick in xs.ticks) {
         final double x = xs.toPixel(tick.value);
-        context.canvas.drawLine(Offset(x, 0), Offset(x, view.size.height), paint);
+        ChartPainter.drawDashedLine(
+          context.canvas,
+          Offset(x, 0),
+          Offset(x, view.size.height),
+          paint,
+          pattern,
+          phase: phase,
+        );
       }
     }
-    if (horizontal && view.scales.containsKey(yScale)) {
-      final ChartScaleView ys = view.scale(yScale);
+    if (horizontal && ys != null) {
+      final double phase = pattern.isEmpty || xs == null ? 0 : -xs.scaledToPixel(0);
       for (final ChartTick tick in ys.ticks) {
         final double y = ys.toPixel(tick.value);
-        context.canvas.drawLine(Offset(0, y), Offset(view.size.width, y), paint);
+        ChartPainter.drawDashedLine(
+          context.canvas,
+          Offset(0, y),
+          Offset(view.size.width, y),
+          paint,
+          pattern,
+          phase: phase,
+        );
       }
     }
   }
@@ -95,5 +123,6 @@ class _GridPainter extends ChartPainter {
       oldDelegate.horizontal != horizontal ||
       oldDelegate.vertical != vertical ||
       oldDelegate.color != color ||
-      oldDelegate.width != width;
+      oldDelegate.width != width ||
+      !listEquals(oldDelegate.dash, dash);
 }
