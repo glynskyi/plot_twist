@@ -2,7 +2,9 @@ name: Publish to pub.dev
 
 # Pushing a tag such as v0.1.1 publishes that version. pub.dev accepts the
 # upload only when automated publishing is turned on for this repository in
-# the package's admin page, with the tag pattern v{{version}}.
+# the package's admin page, with the tag pattern v{{version}}. A version that
+# is already on pub.dev is skipped, so a tag pushed after a publish by hand
+# passes.
 on:
   push:
     tags:
@@ -25,7 +27,19 @@ jobs:
           cache: true
       - name: The tag matches the version in pubspec.yaml
         run: test "v$(grep '^version:' pubspec.yaml | cut -d' ' -f2)" = "$GITHUB_REF_NAME"
-      - run: flutter pub get
-      - run: flutter test
+      # A version published by hand before its tag was pushed is left as it is.
+      - name: Is this version already on pub.dev?
+        id: live
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if curl -sf -o /dev/null "https://pub.dev/api/packages/plot_twist/versions/$version"; then
+            echo "plot_twist $version is already on pub.dev; nothing to publish."
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.live.outputs.published != 'true'
+        run: flutter pub get
+      - if: steps.live.outputs.published != 'true'
+        run: flutter test
       - name: Publish
+        if: steps.live.outputs.published != 'true'
         run: dart pub publish --force
