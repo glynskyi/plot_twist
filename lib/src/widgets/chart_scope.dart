@@ -72,3 +72,51 @@ class ChartDockScope extends InheritedWidget {
   @override
   bool updateShouldNotify(ChartDockScope oldWidget) => oldWidget.side != side;
 }
+
+/// How a series is drawn while it appears. See `ChartAppear`.
+enum ChartAppearEffect {
+  /// Grows along y from the zero line, or from the edge of the plot nearest
+  /// to it. Right for columns and areas. Strokes are stretched while it
+  /// lasts.
+  growY,
+
+  /// Grows along x from the zero line, or from the edge of the plot nearest
+  /// to it. Right for bars that lie.
+  growX,
+
+  /// Is uncovered along the x scale, from its low end. Right for lines.
+  reveal,
+
+  /// Fades in.
+  fade,
+}
+
+/// Tells the series layers below it how far they have appeared.
+///
+/// `ChartAppear` provides one. Every `ChartPaint` below it that paints a
+/// listed series draws itself through [effect] at [progress], which runs
+/// from 0 (nothing to see) to 1 (drawn as usual). Grids, crosshairs and
+/// reference lines are not series and are left alone.
+class ChartAppearScope extends InheritedWidget {
+  /// Creates a scope. A `ChartAppear` does this for you.
+  const ChartAppearScope({
+    super.key,
+    required this.progress,
+    required this.effect,
+    required super.child,
+  });
+
+  /// How far the series have appeared, from 0 to 1.
+  final Animation<double> progress;
+
+  /// How a series that has partly appeared is drawn.
+  final ChartAppearEffect effect;
+
+  /// The closest scope above [context], or null.
+  static ChartAppearScope? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<ChartAppearScope>();
+
+  @override
+  bool updateShouldNotify(ChartAppearScope oldWidget) =>
+      !identical(oldWidget.progress, progress) || oldWidget.effect != effect;
+}

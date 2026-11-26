@@ -46,6 +46,10 @@ class AnimatedChartData extends StatefulWidget {
   ///
   /// Like every transition of this widget, it is skipped when the platform
   /// asks for reduced motion (`MediaQuery.disableAnimations`).
+  ///
+  /// The values themselves grow, so a scale with an automatic range follows
+  /// them: its axis counts up while the bars keep their height. To let
+  /// series grow in under axes that stand still, use `ChartAppear`.
   final bool animateOnMount;
 
   @override

@@ -51,6 +51,11 @@ The painters of the three series are renamed in the same way.
 - `CandlestickSeries(style:)`: `CandleStyle.hollow` outlines the candles that
   close at or above their open, `CandleStyle.ohlc` draws OHLC bars. Both are
   still two draw calls per frame.
+- `ChartAppear`: wrap a series or a whole chart, and its series grow, are
+  uncovered or fade in when first shown (`ChartAppearEffect.growY`, `growX`,
+  `reveal`, `fade`). Only the painting is animated: ranges and hits are
+  final from the first frame, so the axes stand still, and a series of your
+  own gets it too. It is skipped under reduced motion.
 - `ChartLegend`: the colour and label of every series, for a side slot of
   the chart or anywhere else with the chart's controller. It is complete on
   the first frame, wraps, dims hidden series and reports taps

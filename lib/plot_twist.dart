@@ -7,6 +7,7 @@
 library;
 
 export 'src/behaviors/animated_chart_data.dart';
+export 'src/behaviors/chart_appear.dart';
 export 'src/behaviors/chart_crosshair.dart';
 export 'src/behaviors/chart_loader.dart';
 export 'src/behaviors/chart_pan_zoom.dart';

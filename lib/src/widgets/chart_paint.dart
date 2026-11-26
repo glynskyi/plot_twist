@@ -250,6 +250,7 @@ class ChartPaint extends LeafRenderObjectWidget {
   @override
   RenderChartPaint createRenderObject(BuildContext context) {
     final ChartScope scope = ChartScope.of(context);
+    final ChartAppearScope? appear = ChartAppearScope.maybeOf(context);
     return RenderChartPaint(
       painter: painter,
       controller: scope.controller,
@@ -262,13 +263,15 @@ class ChartPaint extends LeafRenderObjectWidget {
       listed: listed,
       clip: clip,
       isolate: isolate,
-    );
+    )..setAppear(appear?.progress, appear?.effect);
   }
 
   @override
   void updateRenderObject(BuildContext context, RenderChartPaint renderObject) {
     final ChartScope scope = ChartScope.of(context);
+    final ChartAppearScope? appear = ChartAppearScope.maybeOf(context);
     renderObject
+      ..setAppear(appear?.progress, appear?.effect)
       ..controller = scope.controller
       ..channel = scope.channel
       ..painter = painter
@@ -424,6 +427,42 @@ class RenderChartPaint extends RenderBox with ChartViewDependent implements Char
     markNeedsPaint();
   }
 
+  Animation<double>? _appear;
+  ChartAppearEffect _appearEffect = ChartAppearEffect.growY;
+
+  /// Sets how far the series has appeared ([progress], from 0 to 1) and how
+  /// it is drawn until then. Null draws it as usual.
+  void setAppear(Animation<double>? progress, ChartAppearEffect? effect) {
+    if (!identical(progress, _appear)) {
+      if (attached) {
+        _appear?.removeListener(markNeedsPaint);
+        progress?.addListener(markNeedsPaint);
+      }
+      _appear = progress;
+      markNeedsPaint();
+    }
+    if (effect != null && effect != _appearEffect) {
+      _appearEffect = effect;
+      markNeedsPaint();
+    }
+  }
+
+  // How far this layer has appeared. Only a listed series takes part: a
+  // grid, a crosshair or a reference line is there from the start.
+  double get _appeared {
+    final Animation<double>? progress = _appear;
+    if (progress == null || !_listed || _painter is! ChartSeriesPainter) return 1;
+    return progress.value.clamp(0.0, 1.0);
+  }
+
+  // The pixel a series grows from along [scale]: its zero line, or the edge
+  // of the plot nearest to it. [fallback] is used when the scale has no zero.
+  static double _origin(ChartScaleView? scale, double fallback) {
+    if (scale == null) return fallback;
+    final double zero = scale.toPixel(0);
+    return zero.isFinite ? zero.clamp(0.0, scale.extent) : fallback;
+  }
+
   void _handleDataChanged() {
     markNeedsPaint();
     _controller.seriesChanged(this);
@@ -443,11 +482,13 @@ class RenderChartPaint extends RenderBox with ChartViewDependent implements Char
   void attach(PipelineOwner owner) {
     super.attach(owner);
     _subscribe(_painter);
+    _appear?.addListener(markNeedsPaint);
     if (_painter is ChartSeriesPainter) _controller.registerSeries(this);
   }
 
   @override
   void detach() {
+    _appear?.removeListener(markNeedsPaint);
     _unsubscribe(_painter);
     if (_painter is ChartSeriesPainter) _controller.unregisterSeries(this);
     super.detach();
@@ -472,12 +513,48 @@ class RenderChartPaint extends RenderBox with ChartViewDependent implements Char
   @override
   void paint(PaintingContext context, Offset offset) {
     if (!_visible || !hasChartView) return;
+    final double appeared = _appeared;
+    if (appeared <= 0) return;
     final ChartView view = chartView;
     final Canvas canvas = context.canvas;
     canvas.save();
     canvas.translate(offset.dx, offset.dy);
     if (_clip) canvas.clipRect(Offset.zero & view.size);
+    bool fading = false;
+    if (appeared < 1) {
+      final ChartSeriesPainter series = _painter as ChartSeriesPainter;
+      final ChartScaleView? xs = view.scales[series.xScale];
+      final ChartScaleView? ys = view.scales[series.yScale];
+      switch (_appearEffect) {
+        case ChartAppearEffect.growY:
+          final double origin = _origin(ys, view.size.height);
+          canvas
+            ..translate(0, origin)
+            ..scale(1, appeared)
+            ..translate(0, -origin);
+        case ChartAppearEffect.growX:
+          final double origin = _origin(xs, 0);
+          canvas
+            ..translate(origin, 0)
+            ..scale(appeared, 1)
+            ..translate(-origin, 0);
+        case ChartAppearEffect.reveal:
+          // From the low end of the x scale, which is on the right when the
+          // scale is reversed.
+          final double shown = view.size.width * appeared;
+          final bool fromRight = xs != null && xs.toPixel(xs.max) < xs.toPixel(xs.min);
+          canvas.clipRect(
+            fromRight
+                ? Rect.fromLTRB(view.size.width - shown, -1e6, 1e6, 1e6)
+                : Rect.fromLTRB(-1e6, -1e6, shown, 1e6),
+          );
+        case ChartAppearEffect.fade:
+          canvas.saveLayer(null, Paint()..color = Color.fromRGBO(0, 0, 0, appeared));
+          fading = true;
+      }
+    }
     _painter.paint(ChartPaintContext(canvas: canvas, view: view, seriesColor: _effectiveColor));
+    if (fading) canvas.restore();
     canvas.restore();
   }
 

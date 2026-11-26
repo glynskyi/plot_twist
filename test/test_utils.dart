@@ -14,19 +14,25 @@ Widget host(Widget chart, {Size size = const Size(400, 300)}) => Directionality(
   ),
 );
 
+const Key _shot = Key('shot');
+
 /// Renders [chart] on white in the 400x300 host and returns a function that
 /// reads the ARGB value of a pixel.
 Future<int Function(int x, int y)> renderPixels(WidgetTester tester, Widget chart) async {
-  const Key key = Key('shot');
   await tester.pumpWidget(
     host(
       RepaintBoundary(
-        key: key,
+        key: _shot,
         child: ColoredBox(color: const Color(0xFFFFFFFF), child: chart),
       ),
     ),
   );
-  final RenderRepaintBoundary boundary = tester.renderObject(find.byKey(key));
+  return capturePixels(tester);
+}
+
+/// Reads the pixels of what [renderPixels] pumped, as it is drawn now.
+Future<int Function(int x, int y)> capturePixels(WidgetTester tester) async {
+  final RenderRepaintBoundary boundary = tester.renderObject(find.byKey(_shot));
   late Uint8List bytes;
   await tester.runAsync(() async {
     final ui.Image image = await boundary.toImage();
