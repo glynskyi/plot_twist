@@ -101,6 +101,91 @@ void main() {
       expect(day.first.label, 'Jan 1');
       expect(day[1].label, '03:00');
     });
+
+    // Ticks of [ticks] for a window of [days] days from [from], on an axis
+    // wide enough for eight of them.
+    List<DateTime> timeTicks(TimeTicks ticks, DateTime from, double days) => ticks
+        .generate(
+          ChartTickContext(
+            min: from.millisecondsSinceEpoch.toDouble(),
+            max: from.millisecondsSinceEpoch + days * 86400e3,
+            extent: 800,
+            direction: Axis.horizontal,
+          ),
+        )
+        .map(
+          (ChartTick t) => DateTime.fromMillisecondsSinceEpoch(t.value.round(), isUtc: ticks.utc),
+        )
+        .toList();
+
+    test('weekly ticks fall on Mondays and do not move while panning', () {
+      const TimeTicks ticks = TimeTicks(utc: true, spacing: 100);
+      final DateTime start = DateTime.utc(2026, 3, 11); // a Wednesday
+      for (final (double days, int step) in <(double, int)>[(56, 7), (112, 14)]) {
+        final List<DateTime> first = timeTicks(ticks, start, days);
+        expect(first.length, greaterThan(5));
+        for (int i = 0; i < first.length; i++) {
+          expect(first[i].weekday, DateTime.monday, reason: '${first[i]}');
+          expect(first[i].hour, 0);
+          if (i > 0) expect(first[i].difference(first[i - 1]).inDays, step);
+        }
+        // A window one day later shows the same ticks, as far as it reaches.
+        final List<DateTime> later = timeTicks(ticks, start.add(const Duration(days: 1)), days);
+        expect(later.toSet().intersection(first.toSet()).length, greaterThanOrEqualTo(5));
+        expect(later.where((DateTime t) => t.weekday != DateTime.monday), isEmpty);
+      }
+      // Before 1970 as well.
+      expect(timeTicks(ticks, DateTime.utc(1969, 6, 4), 56).first, DateTime.utc(1969, 6, 9));
+    });
+
+    // Local time has daylight saving here when the offset differs between
+    // winter and summer. Without it the two tests below could not fail.
+    final bool daylightSaving =
+        DateTime(2026, 1, 15).timeZoneOffset != DateTime(2026, 7, 15).timeZoneOffset;
+    final String? noDaylightSaving = daylightSaving
+        ? null
+        : 'the local time zone (${DateTime.now().timeZoneName}) has no daylight saving time';
+
+    test('local ticks of several days sit at local midnight all year', () {
+      const TimeTicks ticks = TimeTicks(spacing: 100);
+      for (final (double days, int step) in <(double, int)>[(16, 2), (56, 7), (112, 14)]) {
+        for (int month = 1; month <= 12; month++) {
+          final List<DateTime> shown = timeTicks(ticks, DateTime(2026, month, 3, 7), days);
+          expect(shown.length, greaterThan(5));
+          for (int i = 0; i < shown.length; i++) {
+            final DateTime t = shown[i];
+            expect((t.hour, t.minute), (0, 0), reason: '$step-day ticks from month $month: $t');
+            if (step >= 7) expect(t.weekday, DateTime.monday, reason: '$t');
+            if (i > 0) {
+              expect(
+                DateTime.utc(t.year, t.month, t.day)
+                    .difference(
+                      DateTime.utc(shown[i - 1].year, shown[i - 1].month, shown[i - 1].day),
+                    )
+                    .inDays,
+                step,
+              );
+            }
+          }
+        }
+      }
+    }, skip: noDaylightSaving);
+
+    test('local ticks of several hours stay on the clock grid on every day of the year', () {
+      const TimeTicks ticks = TimeTicks(spacing: 100);
+      for (final (double days, int step) in <(double, int)>[(1, 3), (2, 6), (4, 12)]) {
+        for (int day = 0; day < 365; day++) {
+          final List<DateTime> shown = timeTicks(ticks, DateTime(2026, 1, 1 + day, 1, 20), days);
+          expect(shown.length, greaterThanOrEqualTo(6), reason: 'day $day');
+          for (int i = 0; i < shown.length; i++) {
+            final DateTime t = shown[i];
+            expect(t.hour % step, 0, reason: '$step-hour ticks from day $day: $t');
+            expect(t.minute, 0);
+            if (i > 0) expect(t.isAfter(shown[i - 1]), isTrue, reason: 'day $day: $t');
+          }
+        }
+      }
+    }, skip: noDaylightSaving);
   });
 
   group('scale controller', () {

@@ -412,11 +412,15 @@ class TimeTicks extends ChartTicks {
       case ChartTimeUnit.month:
         return _make(t.year, t.month - (t.month - 1) % n);
       case ChartTimeUnit.day:
-        // Align multi-day steps to the epoch so ticks do not shift while panning.
-        final DateTime day = _make(t.year, t.month, t.day);
-        if (n == 1) return day;
-        final int index = (day.millisecondsSinceEpoch / 86400e3).round();
-        return day.subtract(Duration(days: index % n));
+        if (n == 1) return _make(t.year, t.month, t.day);
+        // Steps of several days count from a fixed day, so ticks do not shift
+        // while panning. Day 0 (1 January 1970) was a Thursday; steps of whole
+        // weeks count from the Monday after it.
+        final int index = DateTime.utc(t.year, t.month, t.day).millisecondsSinceEpoch ~/ 86400000;
+        final int sinceTick = (index + (n % 7 == 0 ? 3 : 0)) % n;
+        // Calendar days, not 24-hour spans: a day is longer or shorter when
+        // the clocks change.
+        return _make(t.year, t.month, t.day - sinceTick);
       case ChartTimeUnit.hour:
         return _make(t.year, t.month, t.day, t.hour - t.hour % n);
       case ChartTimeUnit.minute:
@@ -445,7 +449,11 @@ class TimeTicks extends ChartTicks {
       case ChartTimeUnit.day:
         return _make(t.year, t.month, t.day + n);
       case ChartTimeUnit.hour:
-        return t.add(Duration(hours: n));
+        if (n == 1 || utc) return t.add(Duration(hours: n));
+        // In local time the day of a clock change is an hour longer or
+        // shorter. Go a step and a half ahead and back to the grid, so the
+        // ticks stay at 0, 3, 6 … o'clock.
+        return _floor(t.add(Duration(minutes: n * 90)), unit, n);
       case ChartTimeUnit.minute:
         return t.add(Duration(minutes: n));
       case ChartTimeUnit.second:
