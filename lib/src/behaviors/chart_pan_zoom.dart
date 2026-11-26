@@ -12,7 +12,8 @@ enum ChartWheelAction {
   /// Zooms around the pointer.
   zoom,
 
-  /// Pans along the x scale.
+  /// Pans along the x scale, or along the y scale when only that one can be
+  /// panned, as in a chart of horizontal bars.
   pan,
 
   /// Nothing; the wheel is left to whatever is behind the chart.
@@ -376,6 +377,11 @@ class _ChartPanZoomState extends State<ChartPanZoom> with SingleTickerProviderSt
       if (widget.wheel == ChartWheelAction.zoom) {
         zoom(math.exp(-event.scrollDelta.dy / 300));
       } else {
+        if (widget.panY && !widget.panX) {
+          // Only y can be panned: the wheel scrolls the rows, as in a list.
+          pan(Offset(0, -event.scrollDelta.dy));
+          return;
+        }
         // A vertical wheel pans horizontally; a tilt wheel pans directly.
         final double amount = event.scrollDelta.dx != 0
             ? event.scrollDelta.dx

@@ -51,6 +51,11 @@ The painters of the three series are renamed in the same way.
 - `CandlestickSeries(style:)`: `CandleStyle.hollow` outlines the candles that
   close at or above their open, `CandleStyle.ohlc` draws OHLC bars. Both are
   still two draw calls per frame.
+- Horizontal bars: `BarSeries(direction: Axis.horizontal)`. The rows run
+  along the vertical scale and the values along the horizontal one; stacks,
+  offsets, rounded ends and per-bar colours work as for columns. Use
+  `ChartCrosshair(mode: ChartHitMode.nearestY)` with it. With only y to pan,
+  `ChartWheelAction.pan` scrolls the rows.
 - Stacked areas: `LineSeries(baseColumn:)` fills between the line and
   another value column, and takes the layers of `ChartData.stacked` as
   `BarSeries` does. Such a series draws every visible row; it is not reduced
