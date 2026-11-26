@@ -19,14 +19,13 @@ class ScatterSeries extends StatelessWidget {
     this.id,
     this.label,
     this.color,
-    double? pointRadius,
+    this.pointRadius = 3,
     this.visible = true,
     this.xScale = kChartX,
     this.yScale = kChartY,
     this.clip = true,
     this.isolate = true,
-    @Deprecated('Use pointRadius. Removed in 0.3.0.') double? radius,
-  }) : pointRadius = pointRadius ?? radius ?? 3;
+  });
 
   /// The data to plot.
   final ChartData data;
@@ -50,10 +49,6 @@ class ScatterSeries extends StatelessWidget {
 
   /// Dot radius in logical pixels. Defaults to `3`.
   final double pointRadius;
-
-  /// The old name of [pointRadius].
-  @Deprecated('Use pointRadius. Removed in 0.3.0.')
-  double get radius => pointRadius;
 
   /// Whether the series is shown; a hidden series stays listed for legends.
   final bool visible;
@@ -101,12 +96,10 @@ class ScatterSeriesPainter extends ChartSeriesPainter {
     this.column = 0,
     this.sizeColumn,
     this.color,
-    double? pointRadius,
+    this.pointRadius = 3,
     super.xScale,
     super.yScale,
-    @Deprecated('Use pointRadius. Removed in 0.3.0.') double? radius,
-  }) : pointRadius = pointRadius ?? radius ?? 3,
-       super(data: data);
+  }) : super(data: data);
 
   /// The data to plot.
   final ChartData data;
@@ -122,10 +115,6 @@ class ScatterSeriesPainter extends ChartSeriesPainter {
 
   /// Dot radius in logical pixels.
   final double pointRadius;
-
-  /// The old name of [pointRadius].
-  @Deprecated('Use pointRadius. Removed in 0.3.0.')
-  double get radius => pointRadius;
 
   @override
   bool shouldRepaint(ScatterSeriesPainter oldDelegate) =>

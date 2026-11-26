@@ -154,14 +154,6 @@ abstract class ChartTicks {
   }
 }
 
-/// Returns a "nice" step close to [raw].
-@Deprecated('Use ChartTicks.niceStep. Removed in 0.3.0.')
-double niceStep(double raw) => ChartTicks.niceStep(raw);
-
-/// Formats [value] with just enough decimals to distinguish steps of [step].
-@Deprecated('Use ChartTicks.formatNumber. Removed in 0.3.0.')
-String formatNumber(double value, {double? step}) => ChartTicks.formatNumber(value, step: step);
-
 /// "Nice" ticks for a linear scale: multiples of 1, 2, 2.5 or 5 × 10ⁿ.
 class LinearTicks extends ChartTicks {
   /// Creates linear ticks roughly [spacing] logical pixels apart.

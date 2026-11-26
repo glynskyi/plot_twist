@@ -37,19 +37,16 @@ class BarSeries extends StatelessWidget {
     this.label,
     this.color,
     this.colorOf,
-    double? widthFactor,
+    this.widthFactor = 0.7,
     this.step,
     this.offset = 0,
-    double? cornerRadius,
+    this.cornerRadius = 0,
     this.visible = true,
     this.xScale = kChartX,
     this.yScale = kChartY,
     this.clip = true,
     this.isolate = true,
-    @Deprecated('Use widthFactor. Removed in 0.3.0.') double? width,
-    @Deprecated('Use cornerRadius. Removed in 0.3.0.') double? radius,
-  }) : widthFactor = widthFactor ?? width ?? 0.7,
-       cornerRadius = cornerRadius ?? radius ?? 0;
+  });
 
   /// The data to plot.
   final ChartData data;
@@ -86,10 +83,6 @@ class BarSeries extends StatelessWidget {
   /// Bar width as a fraction of [step]. Defaults to `0.7`.
   final double widthFactor;
 
-  /// The old name of [widthFactor].
-  @Deprecated('Use widthFactor. Removed in 0.3.0.')
-  double get width => widthFactor;
-
   /// Distance between bars in data units. Defaults to the distance between
   /// the first two rows.
   final double? step;
@@ -100,10 +93,6 @@ class BarSeries extends StatelessWidget {
   /// Radius of the corners at the end of each bar that points away from its
   /// base, in logical pixels. Defaults to `0`.
   final double cornerRadius;
-
-  /// The old name of [cornerRadius].
-  @Deprecated('Use cornerRadius. Removed in 0.3.0.')
-  double get radius => cornerRadius;
 
   /// Whether the series is shown; a hidden series stays listed for legends.
   final bool visible;
@@ -160,17 +149,13 @@ class BarSeriesPainter extends ChartSeriesPainter {
     this.direction = Axis.vertical,
     this.color,
     this.colorOf,
-    double? widthFactor,
+    this.widthFactor = 0.7,
     this.step,
     this.offset = 0,
-    double? cornerRadius,
+    this.cornerRadius = 0,
     super.xScale,
     super.yScale,
-    @Deprecated('Use widthFactor. Removed in 0.3.0.') double? width,
-    @Deprecated('Use cornerRadius. Removed in 0.3.0.') double? radius,
-  }) : widthFactor = widthFactor ?? width ?? 0.7,
-       cornerRadius = cornerRadius ?? radius ?? 0,
-       super(data: data);
+  }) : super(data: data);
 
   /// The data to plot.
   final ChartData data;
@@ -196,10 +181,6 @@ class BarSeriesPainter extends ChartSeriesPainter {
   /// Bar width as a fraction of the step.
   final double widthFactor;
 
-  /// The old name of [widthFactor].
-  @Deprecated('Use widthFactor. Removed in 0.3.0.')
-  double get width => widthFactor;
-
   /// Distance between bars in data units.
   final double? step;
 
@@ -208,10 +189,6 @@ class BarSeriesPainter extends ChartSeriesPainter {
 
   /// Corner radius in logical pixels.
   final double cornerRadius;
-
-  /// The old name of [cornerRadius].
-  @Deprecated('Use cornerRadius. Removed in 0.3.0.')
-  double get radius => cornerRadius;
 
   double get _step {
     final double? s = step;

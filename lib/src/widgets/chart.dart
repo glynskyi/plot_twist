@@ -34,7 +34,6 @@ class Chart extends StatefulWidget {
     this.y = const LinearScale(),
     this.yScales = const <Object, ChartScale>{},
     this.xScales = const <Object, ChartScale>{},
-    @Deprecated('Use yScales. Removed in 0.3.0.') this.scales = const <Object, ChartScale>{},
     this.left = const <Widget>[],
     this.top = const <Widget>[],
     this.right = const <Widget>[],
@@ -56,10 +55,6 @@ class Chart extends StatefulWidget {
 
   /// Additional vertical scales by id — for example a second Y axis.
   final Map<Object, ChartScale> yScales;
-
-  /// The old name of [yScales]. Its entries are added to those of [yScales].
-  @Deprecated('Use yScales. Removed in 0.3.0.')
-  final Map<Object, ChartScale> scales;
 
   /// Additional horizontal scales by id.
   final Map<Object, ChartScale> xScales;
@@ -123,8 +118,6 @@ class _ChartState extends State<Chart> with TickerProviderStateMixin {
     _controller.configure(<Object, ChartScale>{
       kChartX: widget.x,
       kChartY: widget.y,
-      // ignore: deprecated_member_use_from_same_package
-      ...widget.scales,
       ...widget.yScales,
       ...widget.xScales,
     });

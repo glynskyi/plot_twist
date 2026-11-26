@@ -94,7 +94,7 @@ class CandlestickSeries extends StatelessWidget {
     this.upColor = const Color(0xFF59A14F),
     this.downColor = const Color(0xFFE15759),
     this.style = CandleStyle.filled,
-    double? widthFactor,
+    this.widthFactor = 0.7,
     this.step,
     this.wickWidth = 1,
     this.visible = true,
@@ -102,8 +102,7 @@ class CandlestickSeries extends StatelessWidget {
     this.yScale = kChartY,
     this.clip = true,
     this.isolate = true,
-    @Deprecated('Use widthFactor. Removed in 0.3.0.') double? width,
-  }) : widthFactor = widthFactor ?? width ?? 0.7;
+  });
 
   /// The data to plot.
   final ChartData data;
@@ -138,10 +137,6 @@ class CandlestickSeries extends StatelessWidget {
 
   /// Body width as a fraction of [step]. Defaults to `0.7`.
   final double widthFactor;
-
-  /// The old name of [widthFactor].
-  @Deprecated('Use widthFactor. Removed in 0.3.0.')
-  double get width => widthFactor;
 
   /// Distance between candles in data units. Defaults to the smallest
   /// distance between the first rows, so a weekend or a night without rows
@@ -213,14 +208,12 @@ class CandlestickSeriesPainter extends ChartSeriesPainter {
     required this.upColor,
     required this.downColor,
     this.style = CandleStyle.filled,
-    double? widthFactor,
+    this.widthFactor = 0.7,
     this.step,
     this.wickWidth = 1,
     super.xScale,
     super.yScale,
-    @Deprecated('Use widthFactor. Removed in 0.3.0.') double? width,
-  }) : widthFactor = widthFactor ?? width ?? 0.7,
-       assert(
+  }) : assert(
          data.valueColumns >
              math.max(math.max(openColumn, highColumn), math.max(lowColumn, closeColumn)),
          'A candlestick series needs a ChartData with a value column each for '
@@ -254,10 +247,6 @@ class CandlestickSeriesPainter extends ChartSeriesPainter {
 
   /// Body width as a fraction of the step.
   final double widthFactor;
-
-  /// The old name of [widthFactor].
-  @Deprecated('Use widthFactor. Removed in 0.3.0.')
-  double get width => widthFactor;
 
   /// Distance between candles in data units.
   final double? step;
