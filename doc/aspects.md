@@ -35,7 +35,7 @@ A demo counts as proof only if it follows three rules, which a test in
 3. It has at most 120 lines that are neither blank nor comments, after
    `dart format` at 100 columns.
 
-The 26 demos have 2,211 such lines in total, 85 on average.
+The 26 demos have 2,231 such lines in total, 86 on average.
 
 ## Summary
 

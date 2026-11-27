@@ -373,6 +373,12 @@ void main() {
   group('each aspect is easy', () {
     final RegExp import = RegExp(r'''^import\s+'([^']+)'(?:\s+as\s+\w+)?;''', multiLine: true);
 
+    // Lines that are neither blank nor comments.
+    int counted(String source) => source
+        .split('\n')
+        .where((String l) => l.trim().isNotEmpty && !l.trim().startsWith('//'))
+        .length;
+
     test('every demo is one small file written against the public API', () {
       final List<File> files = Directory('lib/demos').listSync().whereType<File>().toList()
         ..sort((File a, File b) => a.path.compareTo(b.path));
@@ -380,10 +386,7 @@ void main() {
       final StringBuffer report = StringBuffer();
       for (final File file in files) {
         final String source = file.readAsStringSync();
-        final int lines = source
-            .split('\n')
-            .where((String l) => l.trim().isNotEmpty && !l.trim().startsWith('//'))
-            .length;
+        final int lines = counted(source);
         report.writeln('${file.uri.pathSegments.last.padRight(32)} $lines');
         expect(lines, lessThanOrEqualTo(120), reason: '${file.path} is too long');
         for (final RegExpMatch match in import.allMatches(source)) {
@@ -400,6 +403,44 @@ void main() {
       File('${screenshots.path}/line_counts.txt')
         ..createSync(recursive: true)
         ..writeAsStringSync(report.toString());
+    });
+
+    test('the README and doc/aspects.md give the line counts of the demos', () {
+      final Map<String, int> lines = <String, int>{
+        for (final File file in Directory('lib/demos').listSync().whereType<File>())
+          'A${int.parse(RegExp(r'^a(\d+)_').firstMatch(file.uri.pathSegments.last)!.group(1)!)}':
+              counted(file.readAsStringSync()),
+      };
+      // The gallery table of the README: "| A2 | 2D pan and zoom | 54 |".
+      final String readme = File('../README.md').readAsStringSync();
+      final Map<String, int> inReadme = <String, int>{
+        for (final RegExpMatch m in RegExp(r'\| (A\d+) \| [^|\n]+ \| (\d+) ').allMatches(readme))
+          m.group(1)!: int.parse(m.group(2)!),
+      };
+      expect(inReadme, lines);
+      // The summary table of doc/aspects.md, whose fifth column is the count,
+      // and the sentence with the total.
+      final String aspects = File('../doc/aspects.md').readAsStringSync();
+      final Map<String, int> inAspects = <String, int>{
+        for (final RegExpMatch m in RegExp(
+          r'^\| (A\d+) \|[^|\n]+\|[^|\n]+\|[^|\n]+\| (\d+) \|',
+          multiLine: true,
+        ).allMatches(aspects))
+          m.group(1)!: int.parse(m.group(2)!),
+      };
+      expect(inAspects, lines);
+      final int total = lines.values.fold(0, (int sum, int n) => sum + n);
+      final String grouped = total.toString().replaceAllMapped(
+        RegExp(r'(\d)(?=(\d{3})+$)'),
+        (Match m) => '${m.group(1)},',
+      );
+      expect(
+        aspects,
+        contains(
+          'The ${lines.length} demos have $grouped such lines in total, '
+          '${(total / lines.length).round()} on average.',
+        ),
+      );
     });
   });
 }
