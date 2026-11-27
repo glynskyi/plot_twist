@@ -795,5 +795,5 @@ quoted under A10.
 4. Widgets should be real children of a custom multi-child render object:
    placed during layout from data coordinates, built lazily, and laid out
    again instead of rebuilt during a pan.
-5. The core should stay small. plot_twist has about 12,300 lines and depends on
+5. The core should stay small. plot_twist has about 14,600 lines and depends on
    nothing but Flutter.

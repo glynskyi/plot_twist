@@ -28,8 +28,8 @@ instead of forking the library.
   and candlestick charts. Stacked bars and stacked areas; candles that are
   filled, hollow or OHLC bars. Data labels, a legend, reference lines and an
   appear animation are layers you add.
-- Pie and doughnut charts, gauges and radar charts on a `PolarChart`, with
-  the same legend, tooltip, data labels and animations.
+- Pie and doughnut (donut) charts, gauges and radar charts on a
+  `PolarChart`, with the same legend, tooltip, data labels and animations.
 - Linear, log, time and band scales, or your own transform. A time scale
   draws a time series with ticks that follow the calendar.
 - Large datasets: a million-point line pans and zooms without a missed frame
@@ -120,8 +120,9 @@ why it fits a chart.
 | A position derived from live chart state | `ChartPositioned.resolve(position: (view) => …)` | the crossing dot below |
 | Widgets built only for what is visible | `ChartLayoutBuilder<T>(selector: (view) => …, builder: …)` | lazy pins, per-bar semantics |
 | A widget between two data values | `ChartPositioned.span(x1: …, x2: …)` | bands, placeholders, a navigator window |
-| Custom drawing | `ChartPaint(painter: MyPainter())` with a `ChartPainter` | thresholds, donuts |
+| Custom drawing | `ChartPaint(painter: MyPainter())` with a `ChartPainter` | thresholds, shaded zones |
 | A custom series | a `ChartSeriesPainter`: `paint`, `bounds`, `collectHits`, `valueAt` | a sleep hypnogram |
+| A custom series around a circle | the same, with positions from `ChartPolar.resolve(view)` | a rose chart, a sunburst |
 | A custom interaction | `ChartGestureDetector(gestures: …)` and the controller API | a long-press measure tool |
 | A custom scale | subclass `ChartScale`: `transform`, `invert`, `defaultTicks` | a scale that skips weekends |
 | Widget tick labels or axis markers | `ChartAxis(labelBuilder: …, markers: […])` | icons, chips, value pills |

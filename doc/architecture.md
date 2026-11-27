@@ -290,5 +290,5 @@ lib/src/layers/          grids, reference lines, data labels, the legend, the po
 lib/src/behaviors/       pan and zoom, crosshair, tooltip, loader, animated data, appear  (public API only)
 ```
 
-The package is about 12,300 lines of Dart and has no dependencies besides
+The package is about 14,600 lines of Dart and has no dependencies besides
 Flutter.

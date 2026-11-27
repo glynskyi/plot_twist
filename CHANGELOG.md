@@ -1,3 +1,87 @@
+## 0.3.0
+
+Pie and doughnut charts, gauges and radar charts, on a `PolarChart` that
+shares its legend, tooltip, data labels and animations with the other
+charts. The names that 0.2.0 replaced are removed.
+
+### Breaking
+
+- The names deprecated in 0.2.0 are removed: `BarSeries.width` and `radius`,
+  `CandlestickSeries.width`, `ScatterSeries.radius`, `Chart.scales`, and the
+  top-level `formatNumber` and `niceStep`, also on the painters of the three
+  series. Use `widthFactor`, `cornerRadius`, `pointRadius`, `Chart.yScales`,
+  `ChartTicks.formatNumber` and `ChartTicks.niceStep`.
+- `ChartSeries`, the view of a series that the controller hands out, has a
+  new member, `entries`. A class of your own that implements it needs one.
+
+### Changed
+
+- The default tooltip shows `ChartHit.label` and `ChartHit.color` where a
+  hit has them, and the label and colour of its series otherwise. A hit of
+  the built-in Cartesian series has neither, so their tooltips are unchanged.
+- `ChartCrosshair` marks a point in `ChartHit.color` where a hit has one.
+
+### Gallery
+
+- A21 is a doughnut, a gauge and a radar chart from the built-in series. It
+  used to draw a doughnut with a painter of its own.
+
+### New
+
+- `PolarChart`: a chart on a circle. Its `angle` scale runs around the
+  centre and its `radius` scale from the centre outwards; `startAngle`,
+  `sweepAngle` and `innerRadius` say where. Its children are layers, as in a
+  `Chart`, and it has the same side slots. A chart that turns less than a
+  whole circle is laid out so that the drawn part fills the plot.
+- `PieSeries`: one slice per row, as wide as its value, in the colours of
+  the palette or of `colorOf`. `gap` separates the slices by the same
+  distance at every radius, `cornerRadius` rounds them and `offsetOf` pulls
+  one out. On an angle scale with a fixed range the slices cover their share
+  of the circle.
+- `RadialBarSeries`: bars around the centre, one ring per row, for gauges
+  and progress rings. `track` draws the rest of each ring, `cap` rounds the
+  ends, and `baseColumn` starts a bar at a value of its own.
+- `RadarSeries`: a line around the centre with a corner per row, closed and
+  filled. Pointing anywhere in the circle picks the nearest category for
+  every series.
+- `ChartPolarGrid`: rings at the ticks of the radius scale, round or as
+  polygons, and spokes at the ticks of the angle scale.
+- `ChartPolarAxis.angle()` writes the labels of the angle scale around the
+  circle, with optional tick marks, outside it or inside the ring;
+  `ChartPolarAxis.radius()` writes those of the radius scale along a line
+  from the centre.
+- `ChartNeedle(value:)`: the pointer of a gauge.
+- `ChartPolarPositioned`: places a widget by an angle and a radius.
+- `ChartCrosshair.point()`: tracks the single data point under the pointer
+  and draws no lines. It is the crosshair for a polar chart, and suits a
+  scatter plot that wants a tooltip only.
+- `ChartLegend` shows one item for each named slice of a pie. `onEntryTap`
+  reports taps on them and `entryBuilder` builds them.
+- `ChartDataLabels` labels slices and bars around a circle, in their middle,
+  at their rim or outside it, and puts the labels of a radar chart away from
+  the centre.
+- `ChartAppear` in a polar chart: `reveal` uncovers a series around the
+  centre, from the start angle, and `growY` and `growX` grow it out of the
+  centre.
+- [doc/coming_from_charts_flutter.md](https://github.com/glynskyi/plot_twist/blob/main/doc/coming_from_charts_flutter.md):
+  the concepts of charts_flutter and its forks mapped onto plot_twist, with
+  three charts written in both.
+
+For series and painters of your own:
+
+- `ChartPolar` and `ChartPolarView`: the frame of a polar chart, and where
+  its circle and every value are in one frame. `ChartPolarScope.of(context)`
+  reads the frame, and `ChartSeriesPainter.polar` tells the chart that a
+  series is drawn in one.
+- `ChartSector`: a part of a ring, with `contains`, `distanceTo` and
+  `toPath(gap:, cornerRadius:)`.
+- `ChartHit.sector`, `ChartHit.label` and `ChartHit.color`, for a mark that
+  is a sector and has a name or a colour of its own.
+- `ChartSeriesPainter.entries` and `ChartSeriesEntry`: the parts of a series
+  that a legend lists one by one.
+- `kChartAngle` and `kChartRadius`, the ids of the two scales of a polar
+  chart.
+
 ## 0.2.1
 
 No code changes. The description, the topics and the feature list at the top

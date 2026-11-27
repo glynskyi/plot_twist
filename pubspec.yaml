@@ -1,9 +1,9 @@
 name: plot_twist
 description: >-
-  Composable charts for Flutter: line, area, bar, scatter and candlestick
-  series, real-time and time series data, large datasets, pan and zoom, any
-  widget as a tooltip or marker.
-version: 0.2.1
+  Composable charts for Flutter: line, area, bar, pie, gauge, radar, scatter
+  and candlestick. Real-time and time series data, large datasets, pan and
+  zoom, widgets as tooltips.
+version: 0.3.0
 homepage: https://glynskyi.github.io/plot_twist/
 repository: https://github.com/glynskyi/plot_twist
 issue_tracker: https://github.com/glynskyi/plot_twist/issues
@@ -33,6 +33,8 @@ screenshots:
     path: doc/screenshots/a26.png
   - description: A tooltip that is a widget, with an avatar, a small chart and a button.
     path: doc/screenshots/a04.png
+  - description: A doughnut with a legend, a gauge and a radar chart of two series.
+    path: doc/screenshots/a21.png
   - description: Bars, a line and floating min-max bars in one chart, on two Y axes.
     path: doc/screenshots/a11.png
   - description: A legend above four series that take their colours from the theme's palette.
