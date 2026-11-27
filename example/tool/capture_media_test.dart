@@ -217,11 +217,26 @@ class _Recorder {
     }
   }
 
-  Future<void> wheel(Offset at, double dy, int steps, {int framesPerStep = 2}) async {
+  /// Turns the mouse wheel at [at]. Without [hover], the mouse does not move
+  /// there first, so the chart shows no crosshair or tooltip.
+  Future<void> wheel(
+    Offset at,
+    double dy,
+    int steps, {
+    int framesPerStep = 2,
+    bool hover = true,
+  }) async {
     pointer.value = at;
-    await tester.sendEventToBinding(mouse.hover(at));
+    if (hover) await tester.sendEventToBinding(mouse.hover(at));
     for (int i = 0; i < steps; i++) {
-      await tester.sendEventToBinding(mouse.scroll(Offset(0, dy)));
+      await tester.sendEventToBinding(
+        PointerScrollEvent(
+          viewId: tester.view.viewId,
+          device: mouse.device,
+          position: at,
+          scrollDelta: Offset(0, dy),
+        ),
+      );
       await hold(framesPerStep);
     }
   }
@@ -248,11 +263,12 @@ class _Recorder {
     await tester.tapAt(at);
   }
 
-  /// Two taps 80 ms apart, which return a zoomed chart to its range.
-  Future<void> doubleTap(Offset at) async {
-    await tap(at);
+  /// Two taps 80 ms apart, which return a zoomed chart to its range. Without
+  /// [hover], they are touches alone.
+  Future<void> doubleTap(Offset at, {bool hover = true}) async {
+    await tap(at, hover: hover);
     await hold(2);
-    await tap(at);
+    await tap(at, hover: hover);
   }
 
   /// Hovers along [path], which maps 0 to 1 to a position, in [frames] steps.
@@ -525,13 +541,15 @@ final Map<String, _GridClip> _gridClips = <String, _GridClip>{
     await r.hold(8);
   }, target: _chart),
   // The candle tooltip is wider than a chart this small, so this clip leaves
-  // it out: it zooms out to the whole history and back while trades arrive.
+  // it out: the mouse only turns the wheel and the way back is a touch double
+  // tap, so no crosshair shows. It zooms out to the whole history and back
+  // while trades arrive.
   'candlestick': _GridClip('A26', (_Recorder r) async {
     await r.hold(10);
-    await r.wheel(r.at(0.7, 0.5), 80, 12);
+    await r.wheel(r.at(0.7, 0.5), 80, 12, hover: false);
     await r.hold(12);
-    await r.doubleTap(r.at(0.7, 0.5));
-    await r.leave();
+    await r.doubleTap(r.at(0.7, 0.5), hover: false);
+    pointer.value = null;
     await r.hold(30);
   }, target: _chart),
   'doughnut': _GridClip(
