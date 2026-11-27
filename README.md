@@ -8,7 +8,29 @@
 Composable charts for Flutter. **[Try the live gallery](https://glynskyi.github.io/plot_twist/)**:
 26 demos, each one small file.
 
-![Daily candles with volume, zoomed out to thirteen years and back in, with a crosshair and a price tooltip](https://raw.githubusercontent.com/glynskyi/plot_twist/main/.github/media/hero.gif)
+<table>
+<tr>
+<td align="center"><a href="https://glynskyi.github.io/plot_twist/#/a10"><img src="https://raw.githubusercontent.com/glynskyi/plot_twist/main/.github/media/grid/line.webp" width="232" height="232" alt="A line of a million points, zoomed in with the mouse wheel, dragged, and reset with a double tap"></a><br><b>Line</b><br><sub>a million points · <a href="https://github.com/glynskyi/plot_twist/blob/main/example/lib/demos/a10_million_points.dart">code</a></sub></td>
+<td align="center"><a href="https://glynskyi.github.io/plot_twist/#/a6"><img src="https://raw.githubusercontent.com/glynskyi/plot_twist/main/.github/media/grid/area.webp" width="232" height="232" alt="An elevation profile filled below its line, dragged along the track while photo pins come and go with their data"></a><br><b>Area</b><br><sub>with widget pins · <a href="https://github.com/glynskyi/plot_twist/blob/main/example/lib/demos/a06_photo_pins.dart">code</a></sub></td>
+<td align="center"><a href="https://glynskyi.github.io/plot_twist/#/a19"><img src="https://raw.githubusercontent.com/glynskyi/plot_twist/main/.github/media/grid/bar.webp" width="232" height="232" alt="Bars that morph into the data of a month and of a year, lie down, and stand up again"></a><br><b>Bar</b><br><sub>morphs to new data · <a href="https://github.com/glynskyi/plot_twist/blob/main/example/lib/demos/a19_transitions.dart">code</a></sub></td>
+</tr>
+<tr>
+<td align="center"><a href="https://glynskyi.github.io/plot_twist/#/a11"><img src="https://raw.githubusercontent.com/glynskyi/plot_twist/main/.github/media/grid/combo.webp" width="232" height="232" alt="Rain bars, min-max bars and a temperature line grow in on two Y axes, then a tooltip follows the pointer"></a><br><b>Bars and a line</b><br><sub>on two Y axes · <a href="https://github.com/glynskyi/plot_twist/blob/main/example/lib/demos/a11_weather_combo.dart">code</a></sub></td>
+<td align="center"><a href="https://glynskyi.github.io/plot_twist/#/a2"><img src="https://raw.githubusercontent.com/glynskyi/plot_twist/main/.github/media/grid/scatter.webp" width="232" height="232" alt="A scatter plot of 50,000 stars, zoomed in around the pointer, with a tooltip on the nearest star"></a><br><b>Scatter</b><br><sub>50,000 points · <a href="https://github.com/glynskyi/plot_twist/blob/main/example/lib/demos/a02_star_map.dart">code</a></sub></td>
+<td align="center"><a href="https://glynskyi.github.io/plot_twist/#/a26"><img src="https://raw.githubusercontent.com/glynskyi/plot_twist/main/.github/media/grid/candlestick.webp" width="232" height="232" alt="Daily candles with volume, zoomed out to years of history and back while the last candle trades"></a><br><b>Candlestick</b><br><sub>with volume, live · <a href="https://github.com/glynskyi/plot_twist/blob/main/example/lib/demos/a26_candlesticks.dart">code</a></sub></td>
+</tr>
+<tr>
+<td align="center"><a href="https://glynskyi.github.io/plot_twist/#/a21"><img src="https://raw.githubusercontent.com/glynskyi/plot_twist/main/.github/media/grid/doughnut.webp" width="232" height="232" alt="A doughnut draws itself in; a tap on the legend pulls the Travel slice out, and a tooltip shows its amount"></a><br><b>Pie and doughnut</b><br><sub>the legend pulls a slice out · <a href="https://github.com/glynskyi/plot_twist/blob/main/example/lib/demos/a21_polar.dart">code</a></sub></td>
+<td align="center"><a href="https://glynskyi.github.io/plot_twist/#/a21"><img src="https://raw.githubusercontent.com/glynskyi/plot_twist/main/.github/media/grid/gauge.webp" width="232" height="232" alt="A gauge whose ring follows a slider and turns red above 80 percent"></a><br><b>Gauge</b><br><sub>follows a slider · <a href="https://github.com/glynskyi/plot_twist/blob/main/example/lib/demos/a21_polar.dart">code</a></sub></td>
+<td align="center"><a href="https://glynskyi.github.io/plot_twist/#/a21"><img src="https://raw.githubusercontent.com/glynskyi/plot_twist/main/.github/media/grid/radar.webp" width="232" height="232" alt="A radar chart of two models; the tooltip lists both values of the trait under the pointer"></a><br><b>Radar</b><br><sub>one tooltip for both · <a href="https://github.com/glynskyi/plot_twist/blob/main/example/lib/demos/a21_polar.dart">code</a></sub></td>
+</tr>
+</table>
+
+Each picture opens its demo in the gallery. Other demos show
+[live data](https://glynskyi.github.io/plot_twist/#/a15),
+[linked charts](https://glynskyi.github.io/plot_twist/#/a16),
+[a custom series](https://glynskyi.github.io/plot_twist/#/a8) and
+[500 sparklines in a list](https://glynskyi.github.io/plot_twist/#/a24).
 
 A plot_twist chart is a `Stack` in data space. Series, grids, axes, tooltips
 and your own widgets are ordinary children that share one coordinate system.

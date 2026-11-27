@@ -1,3 +1,11 @@
+## 0.3.1
+
+No code changes. The README opens with a grid of the chart types instead of
+one clip of candlesticks: line, area, bar, bars and a line, scatter,
+candlestick, pie and doughnut, gauge and radar. Each is a short clip that
+opens its demo in the gallery. `doc/aspects.md` gives the right total of demo
+lines, 2,231, and a gallery test now checks the counts the docs give.
+
 ## 0.3.0
 
 Pie and doughnut charts, gauges and radar charts, on a `PolarChart` that

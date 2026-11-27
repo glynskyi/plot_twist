@@ -3,7 +3,7 @@ description: >-
   Composable charts for Flutter: line, area, bar, pie, gauge, radar, scatter
   and candlestick. Real-time and time series data, large datasets, pan and
   zoom, widgets as tooltips.
-version: 0.3.0
+version: 0.3.1
 homepage: https://glynskyi.github.io/plot_twist/
 repository: https://github.com/glynskyi/plot_twist
 issue_tracker: https://github.com/glynskyi/plot_twist/issues
